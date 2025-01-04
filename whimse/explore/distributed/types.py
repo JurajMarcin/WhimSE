@@ -29,3 +29,15 @@ class PolicyModuleSource:
         return PolicyModuleSource(
             self.install_method, self.source_package, fetch_package
         )
+
+
+@dataclass()
+class DistPolicy:
+    modules: dict[PolicyModule, PolicyModuleSource]
+    local_modifications: LocalPolicyModifications
+    dontaudit_disabled: bool
+
+    root_path: Path
+
+    def get_file_path(self, file_path: str | Path) -> Path:
+        return self.root_path / Path(file_path).relative_to("/")
