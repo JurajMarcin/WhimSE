@@ -1,0 +1,5 @@
+[project]
+name = "whimse"
+
+[project.scripts]
+whimse = "whimse:main"
