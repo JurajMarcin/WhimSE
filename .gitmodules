@@ -1,0 +1,3 @@
+[submodule "cildiff/selinux"]
+	path = cildiff/selinux
+	url = https://github.com/SELinuxProject/selinux.git
