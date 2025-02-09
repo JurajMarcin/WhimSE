@@ -57,6 +57,26 @@ int main(int argc, char *argv[])
     if (load_cil_file(right_db, cli_options.right_path))
         goto free_cil_db;
 
+    struct cmp_node *left_root = cmp_node_create(cil_node_from_tree_node(left_db->ast->root));
+    struct cmp_node *right_root = cmp_node_create(cil_node_from_tree_node(right_db->ast->root));
+    printf("; Left hash: ");
+    for (size_t i = 0; i < HASH_SIZE; i++) {
+        printf("%02hhx", left_root->full_hash[i]);
+    }
+    putchar('\n');
+    printf("; Right hash: ");
+    for (size_t i = 0; i < HASH_SIZE; i++) {
+        printf("%02hhx", right_root->full_hash[i]);
+    }
+    putchar('\n');
+
+    struct diff_tree_node *diff_root = diff_tree_create(left_root->cil_node, right_root->cil_node);
+    cmp_node_compare(left_root, right_root, diff_root);
+    diff_tree_print(diff_root, stdout);
+
+    diff_tree_destroy(diff_root);
+    cmp_node_destroy(left_root);
+    cmp_node_destroy(right_root);
     rc = EXIT_SUCCESS;
 
 free_cil_db:
