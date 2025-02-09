@@ -230,7 +230,7 @@ class PolicyModuleLang(StrEnum):
 @dataclass(frozen=True)
 class PolicyModule:
     name: str
-    priority: int | None
+    priority: int
     disabled: bool
     files: frozenset[tuple[PolicyModuleLang, str]]
 

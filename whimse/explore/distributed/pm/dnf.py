@@ -246,7 +246,7 @@ class DNFPackageManager(PackageManager):
                     (
                         PolicyModule(
                             name,
-                            None,
+                            -1,
                             False,
                             frozenset(
                                 {(PolicyModuleLang.from_lang_ext(lang_ext), file)}
