@@ -121,5 +121,5 @@ def get_command_executions(
                 and (include_path := Path(cmd[1])).is_file()
             ):
                 yield from get_command_executions(
-                    include_path.read_text(encoding="local"), cmd_pattern, env
+                    include_path.read_text(encoding="locale"), cmd_pattern, env
                 )
