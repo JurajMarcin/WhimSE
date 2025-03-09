@@ -148,7 +148,7 @@ DECLARE_COMPARE(container_sim)
         if (!left_node || !right_node) {
             continue;
         }
-        cmp_node_compare(left_node, right_node, diff_tree_append_child(diff_node, left_node->cil_node, right_node->cil_node));
+        cmp_node_compare(left_node, right_node, diff_tree_append_child(diff_node, left_node, right_node));
         unique_left[sims[i].left_i] = NULL;
         unique_right[sims[i].right_i] = NULL;
     }
@@ -156,14 +156,14 @@ DECLARE_COMPARE(container_sim)
         if (!unique_left[i]) {
             continue;
         }
-        diff_tree_append_diff(diff_node, DIFF_LEFT, unique_left[i]->cil_node, NULL);
+        diff_tree_append_diff(diff_node, DIFF_LEFT, unique_left[i], NULL);
         unique_left[i] = NULL;
     }
     for (size_t i = 0; i < unique_right_count; i++) {
         if (!unique_right[i]) {
             continue;
         }
-        diff_tree_append_diff(diff_node, DIFF_RIGHT, unique_right[i]->cil_node, NULL);
+        diff_tree_append_diff(diff_node, DIFF_RIGHT, unique_right[i], NULL);
         unique_right[i] = NULL;
     }
 

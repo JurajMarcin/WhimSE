@@ -1,32 +1,33 @@
 #include "diff.h"
 
+#include <assert.h>
 #include <stdio.h>
 #include <inttypes.h>
 
-#include <cil_write_ast.h>
+#include <cil/cil.h>
 #include <cil_internal.h>
+#include <cil_tree.h>
+#include <cil_write_ast.h>
 
-#include "cil_node.h"
-#include "cil_tree.h"
 #include "mem.h"
 
 
-struct diff_tree_node *diff_tree_create(const struct cil_node *left_cil_root, const struct cil_node *right_cil_root)
+struct diff_tree_node *diff_tree_create(const struct cmp_node *left_root, const struct cmp_node *right_root)
 {
     struct diff_tree_node *diff_node = mem_alloc(sizeof(*diff_node));
     *diff_node = (struct diff_tree_node) {
-        .left_cil_node = left_cil_root,
-        .right_cil_node = right_cil_root,
+        .left_node = left_root,
+        .right_node = right_root,
     };
     return diff_node;
 }
 
-struct diff_tree_node *diff_tree_append_child(struct diff_tree_node *diff_node_parent, const struct cil_node *left_cil_node, const struct cil_node *right_cil_node)
+struct diff_tree_node *diff_tree_append_child(struct diff_tree_node *diff_node_parent, const struct cmp_node *left_node, const struct cmp_node *right_node)
 {
     struct diff_tree_node *diff_node = mem_alloc(sizeof(*diff_node));
     *diff_node = (struct diff_tree_node) {
-        .left_cil_node = left_cil_node,
-        .right_cil_node = right_cil_node,
+        .left_node = left_node,
+        .right_node = right_node,
         .parent = diff_node_parent,
     };
     if (diff_node_parent->cl_tail) {
@@ -39,12 +40,12 @@ struct diff_tree_node *diff_tree_append_child(struct diff_tree_node *diff_node_p
     return diff_node;
 }
 
-struct diff *diff_tree_append_diff(struct diff_tree_node *diff_node, enum diff_side side, const struct cil_node *cil_node, char *description)
+struct diff *diff_tree_append_diff(struct diff_tree_node *diff_node, enum diff_side side, const struct cmp_node *node, char *description)
 {
     struct diff *diff = mem_alloc(sizeof(*diff));
     *diff = (struct diff) {
         .side = side,
-        .cil_node = cil_node,
+        .node = node,
         .decription = description,
     };
     if (diff_node->dl_tail) {
@@ -62,15 +63,9 @@ static void diff_print_context(enum diff_side side, const struct diff_tree_node 
     if (diff_node->parent) {
         diff_print_context(side, diff_node->parent, out);
     }
-    const struct cil_node *cil_node = side == DIFF_LEFT ? diff_node->left_cil_node : diff_node->right_cil_node;
-    switch (cil_node->type) {
-    case CIL_NODE_TREE:
-        fprintf(out, "; \t%s node on line %" PRIu32 "\n", cil_node_to_string(cil_node->orig.tree_node), cil_node->orig.tree_node->line);
-        break;
-    case CIL_NODE_LIST:
-        fprintf(out, "; \t list item" PRIu32 "\n");
-        break;
-    }
+    const struct cmp_node *node = side == DIFF_LEFT ? diff_node->left_node : diff_node->right_node;
+    assert(node);
+    fprintf(out, "; \t%s node on line %" PRIu32 "\n", cil_node_to_string(node->cil_node), node->cil_node->line);
 }
 
 static void diff_print(const struct diff_tree_node *parent, const struct diff *diff, FILE *out)
@@ -84,8 +79,16 @@ static void diff_print(const struct diff_tree_node *parent, const struct diff *d
     fprintf(out, "; Right context:\n");
     diff_print_context(DIFF_RIGHT, parent, out);
     fprintf(out, "; %s\n", diff->side == DIFF_LEFT ? "+++": "---");
-    cil_write_ast_node(out, diff->cil_node->orig.tree_node);
-    cil_write_ast(out, CIL_WRITE_AST_PHASE_BUILD, diff->cil_node->orig.tree_node);
+    cil_write_ast_node(out, diff->node->cil_node);
+    switch (diff->node->cil_node->flavor) {
+    case CIL_CLASS:
+    case CIL_COMMON:
+    case CIL_MAP_CLASS:
+        break;
+    default:
+        cil_write_ast(out, CIL_WRITE_AST_PHASE_BUILD, diff->node->cil_node);
+        break;
+    }
     fprintf(out, "; ===\n");
 }
 

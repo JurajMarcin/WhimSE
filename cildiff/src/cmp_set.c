@@ -8,6 +8,8 @@
 #include <openssl/evp.h>
 
 #include <sepol/policydb/hashtab.h>
+#include <cil/cil.h>
+#include <cil_tree.h>
 
 #include "cmp_common.h"
 #include "cmp_node.h"
@@ -35,18 +37,23 @@ static int set_finalize(hashtab_key_t key, hashtab_datum_t datum, void *opaque)
     return 0;
 }
 
-struct cmp_set *cmp_set_create(struct cil_node *cl_head)
+struct cmp_set *cmp_set_create(struct cil_tree_node *cl_head)
 {
     struct cmp_set *set = mem_alloc(sizeof(*set));
 
     size_t child_count = 0;
-    for (const struct cil_node *cil_node = cl_head; cil_node; cil_node = cil_node->next) {
+    for (const struct cil_tree_node *cil_node = cl_head; cil_node; cil_node = cil_node->next) {
         child_count++;
+    }
+    if (!child_count) {
+        set->items = NULL;
+        cmp_hash(strlen("<empty-set>"), "<empty-set>", set->full_hash);
+        return set;
     }
     set->items = hashtab_create(&cmp_hash_hashtab_hash, &cmp_hash_hashtab_cmp, child_count);
     mem_check(set->items);
 
-    struct cil_node *cil_node = cl_head;
+    struct cil_tree_node *cil_node = cl_head;
     while (cil_node) {
         struct cmp_node *node = cmp_node_create(cil_node);
         cil_node = cil_node->next;
@@ -173,6 +180,9 @@ static int set_detroy_map(hashtab_key_t key, hashtab_datum_t datum, void *opaque
 
 void cmp_set_destroy(struct cmp_set *set)
 {
+    if (!set) {
+        return;
+    }
     hashtab_map(set->items, &set_detroy_map, NULL);
     hashtab_destroy(set->items);
     mem_free(set);

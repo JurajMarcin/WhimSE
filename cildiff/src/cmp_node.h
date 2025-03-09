@@ -3,19 +3,18 @@
 
 #include <sepol/policydb/hashtab.h>
 
-#include "cil_node.h"
 #include "cmp_common.h"
 #include "diff.h"
 
 
 struct cmp_node {
-    struct cil_node *cil_node;
+    struct cil_tree_node *cil_node;
     char partial_hash[HASH_SIZE];
     char full_hash[HASH_SIZE];
     void *data;
 };
 
-struct cmp_node *cmp_node_create(struct cil_node *cil_node);
+struct cmp_node *cmp_node_create(struct cil_tree_node *cil_node);
 
 void cmp_node_compare(const struct cmp_node *left, const struct cmp_node *right, struct diff_tree_node *diff_node);
 

@@ -3,20 +3,26 @@
 #include <assert.h>
 #include <string.h>
 
+#include <cil/cil.h>
+#include <cil_tree.h>
+
 #include "cmp_common.h"
 #include "cmp_node_defs.h"
 #include "mem.h"
 #include "utils.h"
 
 
-struct cmp_node *cmp_node_create(struct cil_node *cil_node)
+struct cmp_node *cmp_node_create(struct cil_tree_node *cil_node)
 {
     const struct cmp_node_def *def = cmp_node_get_def(cil_node);
     struct cmp_node *node = mem_alloc(sizeof(*node));
     *node = (struct cmp_node) {
         .cil_node = cil_node,
-        .data = mem_alloc(def->data_size),
     };
+    if (def->data_size) {
+        node->data = mem_alloc(def->data_size);
+        memset(node->data, 0, def->data_size);
+    }
     if (!def->init(node)) {
         memcpy(node->partial_hash, node->full_hash, HASH_SIZE);
     }
@@ -50,11 +56,13 @@ struct cmp_sim cmp_node_sim(const struct cmp_node *left, const struct cmp_node *
 
 void cmp_node_destroy(struct cmp_node *node)
 {
+    if (!node) {
+        return;
+    }
     const struct cmp_node_def *def = cmp_node_get_def(node->cil_node);
     if (def->destroy) {
         def->destroy(node);
     }
-    mem_free(node->cil_node);
     mem_free(node->data);
     mem_free(node);
 }
