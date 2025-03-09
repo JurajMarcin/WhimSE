@@ -7,7 +7,7 @@
 #include <openssl/evp.h>
 #include <time.h>
 
-void cmp_hash(size_t data_len, const char data[data_len], char hash[HASH_SIZE])
+void cmp_hash(size_t data_len, const void *data, char hash[HASH_SIZE])
 {
     struct cmp_hash_state *hash_state = cmp_hash_begin(NULL);
     cmp_hash_update(hash_state, data_len, data);
@@ -23,17 +23,17 @@ struct cmp_hash_state *cmp_hash_begin(const char *flavor)
     struct cmp_hash_state *hash_state = mem_alloc(sizeof(*hash_state));
     hash_state->ctx = EVP_MD_CTX_new();
     mem_check(hash_state->ctx);
-    const EVP_MD *md = EVP_sha512();
+    const EVP_MD *md = EVP_sha256();
     if (!EVP_DigestInit_ex(hash_state->ctx, md, NULL)) {
         error(EXIT_FAILURE, 0, "Failed to initialize hash state");
     }
     if (flavor) {
-        cmp_hash_update(hash_state, strlen(flavor) + 1, flavor);
+        cmp_hash_update_string(hash_state, flavor);
     }
     return hash_state;
 }
 
-void cmp_hash_update(struct cmp_hash_state *hash_state, size_t data_len, const char *data)
+void cmp_hash_update(struct cmp_hash_state *hash_state, size_t data_len, const void *data)
 {
     if (!EVP_DigestUpdate(hash_state->ctx, data, data_len)) {
         error(EXIT_FAILURE, 0, "Failed to update hash state with data of length %zu", data_len);
@@ -48,17 +48,14 @@ void cmp_hash_update_string(struct cmp_hash_state *hash_state, const char *strin
 struct cmp_hash_state *cmp_hash_copy(const struct cmp_hash_state *hash_state)
 {
     struct cmp_hash_state *new_hash_state = mem_alloc(sizeof(*hash_state));
-    new_hash_state->ctx = EVP_MD_CTX_new();
-    mem_check(hash_state->ctx);
-    if (!EVP_MD_CTX_copy_ex(new_hash_state->ctx, hash_state->ctx)) {
-        error(EXIT_FAILURE, 0, "Failed to copy hash state");
-    }
+    new_hash_state->ctx = EVP_MD_CTX_dup(hash_state->ctx);
+    mem_check(new_hash_state->ctx);
     return new_hash_state;
 }
 
 void cmp_hash_finish(struct cmp_hash_state *hash_state, char hash[HASH_SIZE])
 {
-    unsigned char md[EVP_MAX_MD_SIZE] = {0};
+    unsigned char md[EVP_MAX_MD_SIZE > HASH_SIZE ? EVP_MAX_MD_SIZE : HASH_SIZE] = {0};
     if (!EVP_DigestFinal_ex(hash_state->ctx, md, NULL)) {
         error(EXIT_FAILURE, 0, "Failed to finalize hash state");
     }

@@ -6,17 +6,17 @@
 #include <sepol/policydb/hashtab.h>
 
 
-#define HASH_SIZE 64
+#define HASH_SIZE 32
 
 
-void cmp_hash(size_t data_len, const char data[data_len], char hash[HASH_SIZE]);
+void cmp_hash(size_t data_len, const void *data, char hash[HASH_SIZE]);
 
 
 struct cmp_hash_state;
 
 struct cmp_hash_state *cmp_hash_begin(const char *flavor);
 
-void cmp_hash_update(struct cmp_hash_state *hash_state, size_t data_len, const char *data);
+void cmp_hash_update(struct cmp_hash_state *hash_state, size_t data_len, const void *data);
 
 void cmp_hash_update_string(struct cmp_hash_state *hash_state, const char *string);
 
