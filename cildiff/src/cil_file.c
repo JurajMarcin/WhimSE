@@ -122,6 +122,9 @@ exit:
 
 void cil_file_destroy(struct cil_file *cil_file)
 {
+    if (!cil_file) {
+        return;
+    }
     free(cil_file->data);
     cil_file->data = NULL;
     cil_file->data_len = 0;
