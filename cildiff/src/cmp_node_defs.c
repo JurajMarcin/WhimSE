@@ -7,207 +7,204 @@
 #include <cil_internal.h>
 #include <cil_flavor.h>
 
-#include "cil_node.h"
 #include "cil_tree.h"
 #include "cmp_common.h"
+#include "cmp_data.h"
 #include "cmp_node.h"
 #include "cmp_set.h"
 #include "diff.h"
 #include "utils.h"
 
 
-#define DECLARE(name) \
-    static bool cmp_node_init_ ## name (struct cmp_node *node, struct cmp_hash_state *hash_state); \
-    static bool __cmp_node_init_ ## name ## _shim (struct cmp_node *node) { \
-        struct cmp_hash_state *hash_state = cmp_hash_begin(#name); \
-        return cmp_node_init_ ## name (node, hash_state); \
-    }
-#define DECLARE_WITH_DATA(name) \
-    DECLARE(name) \
-    static void cmp_node_destroy_ ## name (struct cmp_node *node); \
-    struct cmp_node_ ## name
-#define DECLARE_COMPARE(name) \
-    static void cmp_node_compare_ ## name (const struct cmp_node *left, const struct cmp_node *right, struct diff_tree_node *diff_node)
-#define DECLARE_SIM(name) \
-    static struct cmp_sim cmp_node_sim_ ## name (const struct cmp_node *left, const struct cmp_node *right)
+#define DECLARE_NODE(name) \
+struct cmp_node_ ## name
+#define DECLARE_NODE_INIT(name) \
+static bool cmp_node_init_ ## name (struct cmp_node *node)
+#define DECLARE_NODE_COMPARE(name) \
+static void cmp_node_compare_ ## name (const struct cmp_node *left, const struct cmp_node *right, struct diff_tree_node *diff_node)
+#define DECLARE_NODE_SIM(name) \
+static struct cmp_sim cmp_node_sim_ ## name (const struct cmp_node *left, const struct cmp_node *right)
+#define DECLARE_NODE_DESTROY(name) \
+static void cmp_node_destroy_ ## name (struct cmp_node *node)
 
-#define REGISTER(name) \
-    .init = &__cmp_node_init_ ## name ## _shim
-#define REGISTER_WITH_DATA(name) \
-    .init = &__cmp_node_init_ ## name ## _shim, \
+#define REGISTER_NODE(name) \
+    .init = &cmp_node_init_ ## name, \
     .destroy = &cmp_node_destroy_ ## name, \
     .data_size = sizeof(struct cmp_node_ ## name)
-#define REGISTER_COMPARE(name) \
+#define REGISTER_NODE_COMPARE(name) \
     .compare = &cmp_node_compare_ ## name
-#define REGISTER_SIM(name) \
+#define REGISTER_NODE_SIM(name) \
     .sim = &cmp_node_sim_ ## name
 
 
-DECLARE_WITH_DATA(container) {
+/******************************************************************************
+ *   Common Nodes                                                             *
+ ******************************************************************************/
+
+DECLARE_NODE(container) {
     struct cmp_set *items;
 };
-DECLARE_COMPARE(container);
-DECLARE_SIM(container);
-
-DECLARE_WITH_DATA(avrule) {
-    struct cmp_set *classperms;
-};
-
-DECLARE_WITH_DATA(classperms) {
-    struct cmp_set *perms;
-};
-
-DECLARE(string)
-
-// DECLARE_WITH_DATA(optional) {
-//     struct cmp_set *items;
-// };
-
-
-static const struct cmp_node_def node_defs[] = {
-    [CIL_ROOT] = { REGISTER_WITH_DATA(container), REGISTER_COMPARE(container), REGISTER_SIM(container) },
-    [CIL_SRC_INFO] = { REGISTER_WITH_DATA(container), REGISTER_COMPARE(container), REGISTER_SIM(container) },
-    [CIL_AVRULE] = { REGISTER_WITH_DATA(avrule) },
-    [CIL_CLASSPERMS] = { REGISTER_WITH_DATA(classperms) },
-    [CIL_STRING] = { REGISTER(string) },
-    [CIL_OPTIONAL] = { REGISTER_WITH_DATA(container), REGISTER_COMPARE(container), REGISTER_SIM(container) },
-};
-#define NODE_DEFS_COUNT (sizeof(node_defs) / sizeof(*node_defs))
-
-
-const struct cmp_node_def *cmp_node_get_def_flavor(enum cil_flavor flavor)
+DECLARE_NODE_INIT(container)
 {
-    if (flavor >= NODE_DEFS_COUNT || node_defs[flavor].init == NULL) {
-        error(EXIT_FAILURE, 0, "Encountered an unknown node type %d", flavor);
-    }
-    return &node_defs[flavor];
-}
-
-const struct cmp_node_def *cmp_node_get_def(struct cil_node *cil_node)
-{
-    if (cil_node->flavor >= NODE_DEFS_COUNT || node_defs[cil_node->flavor].init == NULL) {
-        struct cil_tree_node tree_node;
-        switch (cil_node->type) {
-        case CIL_NODE_TREE:
-            tree_node = *cil_node->orig.tree_node;
-            break;
-        case CIL_NODE_LIST:
-            tree_node = (struct cil_tree_node) {
-                .flavor = cil_node->orig.list_item->flavor,
-                .data = cil_node->orig.list_item->data,
-            };
-            break;
-        }
-        const char *node_name = cil_node_to_string(&tree_node);
-        error(EXIT_FAILURE, 0, "Encountered an unknown node type %d (%s)", cil_node->flavor, node_name);
-    }
-    return &node_defs[cil_node->flavor];
-}
-
-
-static bool cmp_node_init_container(struct cmp_node *node, struct cmp_hash_state *partial_hash)
-{
-    assert(node->cil_node->type == CIL_NODE_TREE);
     struct cmp_node_container *data = node->data;
-    data->items = cmp_set_create(cil_node_from_tree_node(node->cil_node->orig.tree_node->cl_head));
+    data->items = cmp_set_create(node->cil_node->cl_head);
 
-    cmp_hash_update(partial_hash, sizeof(node->cil_node->flavor), (char *)&node->cil_node->flavor);
-    cmp_hash_finish(partial_hash, node->partial_hash);
-    memcpy(node->full_hash, data->items->full_hash, HASH_SIZE);
+    struct cmp_data cmp_data = {0};
+    cmp_data_init(node->cil_node->flavor, node->cil_node->data, &cmp_data);
+
+    memcpy(node->partial_hash, cmp_data.partial_hash, HASH_SIZE);
+
+    struct cmp_hash_state *hash_state = cmp_hash_begin(NULL);
+    cmp_hash_update(hash_state, HASH_SIZE, cmp_data.full_hash);
+    cmp_hash_update(hash_state, HASH_SIZE, data->items->full_hash);
+    cmp_hash_finish(hash_state, node->full_hash);
+
     return true;
 }
-
-static void cmp_node_compare_container(const struct cmp_node *left, const struct cmp_node *right, struct diff_tree_node *diff_node)
+DECLARE_NODE_COMPARE(container)
 {
     const struct cmp_node_container *left_data = MAYBE(left, data);
     const struct cmp_node_container *right_data = MAYBE(right, data);
     cmp_set_compare(MAYBE(left_data, items), MAYBE(right_data, items), diff_node);
 }
-
-static struct cmp_sim cmp_node_sim_container(const struct cmp_node *left, const struct cmp_node *right)
+DECLARE_NODE_SIM(container)
 {
     const struct cmp_node_container *left_data = MAYBE(left, data);
     const struct cmp_node_container *right_data = MAYBE(right, data);
     return cmp_set_sim(MAYBE(left_data, items), MAYBE(right_data, items));
 }
-
-static void cmp_node_destroy_container(struct cmp_node *node)
+DECLARE_NODE_DESTROY(container)
 {
     struct cmp_node_container *data = node->data;
     cmp_set_destroy(data->items);
 }
 
-static bool cmp_node_init_avrule(struct cmp_node *node, struct cmp_hash_state *partial_hash)
+/******************************************************************************
+ *  Conditional Statements                                                    *
+ ******************************************************************************/
+
+enum {
+    COND_ITEMS_FALSE = 0,
+    COND_ITEMS_TRUE,
+    COND_ITEMS__MAX,
+};
+
+DECLARE_NODE(cond_container) {
+    struct cmp_set *items[2];
+};
+DECLARE_NODE_INIT(cond_container)
 {
-    struct cmp_node_avrule *data = node->data;
-    struct cil_avrule *avrule = node->cil_node->data;
-    data->classperms = cmp_set_create(cil_node_from_list_node(avrule->perms.classperms->head));
+    struct cmp_node_cond_container *data = node->data;
+    struct cmp_data cmp_data = {0};
+    cmp_data_init(node->cil_node->flavor, node->cil_node->data, &cmp_data);
+    memcpy(node->partial_hash, cmp_data.partial_hash, HASH_SIZE);
 
-    cmp_hash_update(partial_hash, sizeof(avrule->rule_kind), (const char *)&avrule->rule_kind);
-    cmp_hash_update_string(partial_hash, avrule->src_str);
-    cmp_hash_update_string(partial_hash, avrule->tgt_str);
+    for (const struct cil_tree_node *condblock = node->cil_node->cl_head; condblock; condblock = condblock->next) {
+        assert(condblock->flavor == CIL_CONDBLOCK);
+        static const int cil_cond_map[] = {
+            [CIL_CONDFALSE] = COND_ITEMS_FALSE,
+            [CIL_CONDTRUE] = COND_ITEMS_TRUE,
+        };
+        const struct cil_condblock *condblock_data = condblock->data;
+        data->items[cil_cond_map[condblock_data->flavor]] = cmp_set_create(condblock->cl_head);
+    }
 
-    struct cmp_hash_state *full_hash = cmp_hash_copy(partial_hash);
-    cmp_hash_update(full_hash, HASH_SIZE, data->classperms->full_hash);
+    struct cmp_hash_state *hash_state = cmp_hash_begin(NULL);
+    cmp_hash_update(hash_state, HASH_SIZE, cmp_data.full_hash);
 
-    cmp_hash_finish(partial_hash, node->partial_hash);
-    cmp_hash_finish(full_hash, node->full_hash);
+    for (size_t i = 0; i < COND_ITEMS__MAX; i++) {
+        static const char *cond_name_map[] = {
+            [COND_ITEMS_FALSE] = "<cond::false>",
+            [COND_ITEMS_TRUE] = "<cond::true>",
+        };
+        cmp_hash_update_string(hash_state, cond_name_map[i]);
+        if (data->items[i]) {
+            cmp_hash_update(hash_state, HASH_SIZE, data->items[i]->full_hash);
+        } else {
+            cmp_hash_update_string(hash_state, "<cond::empty>");
+        }
+    }
+    cmp_hash_finish(hash_state, node->full_hash);
+
     return true;
 }
-
-static void cmp_node_destroy_avrule(struct cmp_node *node)
+DECLARE_NODE_COMPARE(cond_container)
 {
-    struct cmp_node_avrule *data = node->data;
-    cmp_set_destroy(data->classperms);
+    const struct cmp_node_cond_container *left_data = MAYBE(left, data);
+    const struct cmp_node_cond_container *right_data = MAYBE(right, data);
+    for (size_t i = 0; i < COND_ITEMS__MAX; i++) {
+        cmp_set_compare(MAYBE(left_data, items[i]), MAYBE(right_data, items[i]), diff_node);
+    }
+}
+DECLARE_NODE_SIM(cond_container)
+{
+    const struct cmp_node_cond_container *left_data = MAYBE(left, data);
+    const struct cmp_node_cond_container *right_data = MAYBE(right, data);
+    struct cmp_sim total_sim = {0};
+    for (size_t i = 0; i < COND_ITEMS__MAX; i++) {
+        struct cmp_sim sim = cmp_set_sim(MAYBE(left_data, items[i]), MAYBE(right_data, items[i]));
+        cmp_sim_add(&total_sim, &sim);
+    }
+    return total_sim;
+}
+DECLARE_NODE_DESTROY(cond_container)
+{
+    struct cmp_node_cond_container *data = node->data;
+    for (size_t i = 0; i < COND_ITEMS__MAX; i++) {
+        cmp_set_destroy(data->items[i]);
+    }
 }
 
-static bool cmp_node_init_classperms(struct cmp_node *node, struct cmp_hash_state *full_hash)
+
+static const struct cmp_node_def node_defs[] = {
+    /* Common and Utility Nodes */
+    [CIL_ROOT] = { REGISTER_NODE(container), REGISTER_NODE_COMPARE(container), REGISTER_NODE_SIM(container) },
+    [CIL_SRC_INFO] = { REGISTER_NODE(container), REGISTER_NODE_COMPARE(container), REGISTER_NODE_SIM(container) },
+    /* Call / Macro Statements */
+    [CIL_MACRO] = { REGISTER_NODE(container), REGISTER_NODE_COMPARE(container) },
+    /* Class and Permission Statements */
+    [CIL_COMMON] = { REGISTER_NODE(container), REGISTER_NODE_COMPARE(container) },
+    [CIL_CLASS] = { REGISTER_NODE(container), REGISTER_NODE_COMPARE(container) },
+    [CIL_MAP_CLASS] = { REGISTER_NODE(container), REGISTER_NODE_COMPARE(container) },
+    /* Conditional Statements */
+    [CIL_BOOLEANIF] = { REGISTER_NODE(cond_container), REGISTER_NODE_COMPARE(cond_container), REGISTER_NODE_SIM(cond_container) },
+    [CIL_TUNABLEIF] = { REGISTER_NODE(cond_container), REGISTER_NODE_COMPARE(cond_container), REGISTER_NODE_SIM(cond_container) },
+    /* Container Statements */
+    [CIL_BLOCK] = { REGISTER_NODE(container), REGISTER_NODE_COMPARE(container) },
+    [CIL_OPTIONAL] = { REGISTER_NODE(container), REGISTER_NODE_COMPARE(container), REGISTER_NODE_SIM(container) },
+    [CIL_IN] = { REGISTER_NODE(container), REGISTER_NODE_COMPARE(container) },
+};
+#define NODE_DEFS_COUNT (sizeof(node_defs) / sizeof(*node_defs))
+
+
+static bool cmp_node_default_init(struct cmp_node *node)
 {
-    struct cmp_node_classperms *data = node->data;
-    struct cil_classperms *classperms = node->cil_node->data;
-    data->perms = cmp_set_create(cil_node_from_list_node(classperms->perm_strs->head));
-
-    cmp_hash_update_string(full_hash, classperms->class_str);
-    cmp_hash_update(full_hash, HASH_SIZE, data->perms->full_hash);
-
-    cmp_hash_finish(full_hash, node->full_hash);
+    struct cmp_data cmp_data = {0};
+    cmp_data_init(node->cil_node->flavor, node->cil_node->data, &cmp_data);
+    memcpy(node->partial_hash, cmp_data.partial_hash, HASH_SIZE);
+    memcpy(node->full_hash, cmp_data.full_hash, HASH_SIZE);
     return false;
 }
 
-static void cmp_node_destroy_classperms(struct cmp_node *node)
+
+static const struct cmp_node_def default_def = { .init = &cmp_node_default_init };
+
+
+const struct cmp_node_def *cmp_node_get_def_flavor(enum cil_flavor flavor)
 {
-    struct cmp_node_classperms *data = node->data;
-    cmp_set_destroy(data->perms);
+    if (flavor >= NODE_DEFS_COUNT || node_defs[flavor].init == NULL) {
+        return &default_def;
+    }
+    return &node_defs[flavor];
 }
 
-static bool cmp_node_init_string(struct cmp_node *node, struct cmp_hash_state *full_hash)
+const struct cmp_node_def *cmp_node_get_def(const struct cil_tree_node *cil_node)
 {
-    cmp_hash_update_string(full_hash, node->cil_node->data);
-
-    cmp_hash_finish(full_hash, node->full_hash);
-    return false;
+    if (cil_node->flavor >= NODE_DEFS_COUNT || node_defs[cil_node->flavor].init == NULL) {
+        return &default_def;
+    }
+    return &node_defs[cil_node->flavor];
 }
-
-// static bool cmp_node_init_optional(struct cmp_node *node, struct cmp_hash_state *partial_hash)
-// {
-//     assert(node->cil_node->type == CIL_NODE_TREE);
-//     struct cmp_node_optional *data = node->data;
-//     data->items = cmp_set_create(cil_node_from_tree_node(node->cil_node->orig.tree_node->cl_head));
-
-//     struct cmp_hash_state *full_hash = cmp_hash_copy(partial_hash);
-//     cmp_hash_update(full_hash, HASH_SIZE, data->items->full_hash);
-//
-//     cmp_hash_finish(partial_hash, node->partial_hash);
-//     cmp_hash_finish(full_hash, node->full_hash);
-//     return true;
-// }
-
-// static void cmp_node_destroy_optional(struct cmp_node *node)
-// {
-//     struct cmp_node_optional *data = node->data;
-//     cmp_set_destroy(data->items);
-// }
-
 
 const struct cmp_set *cmp_node_src_info_items(const struct cmp_node *node)
 {

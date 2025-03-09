@@ -21,7 +21,7 @@
 int load_cil_file(cil_db_t *cil_db, const char *file_path)
 {
     int rc = -1;
-    struct cil_file cil_file;
+    struct cil_file cil_file = {0};
 
     if (cil_file_read(file_path, &cil_file))
         goto exit;

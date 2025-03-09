@@ -2,6 +2,7 @@
 #define MEM_H
 
 #include <stddef.h>
+#include <stdlib.h>
 
 
 void *__mem_alloc(size_t size, const char *file, int line);

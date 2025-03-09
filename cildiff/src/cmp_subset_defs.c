@@ -15,48 +15,66 @@
 #include "utils.h"
 
 
-#define DECLARE(name) \
+#define DECLARE_SUBSET(name) \
     struct cmp_subset_ ## name
-#define DECLARE_INIT(name) \
+#define DECLARE_SUBSET_INIT(name) \
     static void cmp_subset_ ## name ## _init(struct cmp_subset *subset)
-#define DECLARE_ADD_NODE(name) \
+#define DECLARE_SUBSET_ADD_NODE(name) \
     static void cmp_subset_ ## name ## _add_node(struct cmp_subset *subset, struct cmp_node *node)
-#define DECLARE_FINALIZE(name) \
+#define DECLARE_SUBSET_FINALIZE(name) \
     static bool cmp_subset_ ## name ## _finalize(struct cmp_subset *subset)
-#define DECLARE_COMPARE(name) \
+#define DECLARE_SUBSET_COMPARE(name) \
     static void cmp_subset_ ## name ## _compare(const struct cmp_subset *left, const struct cmp_subset *right, struct diff_tree_node *diff_node)
-#define DECLARE_SIM(name) \
+#define DECLARE_SUBSET_SIM(name) \
     static void cmp_subset_ ## name ## _sim(const struct cmp_subset *left, const struct cmp_subset *right)
-#define DECLARE_DESTROY(name) \
+#define DECLARE_SUBSET_DESTROY(name) \
     static void cmp_subset_ ## name ## _destroy(struct cmp_subset *subset)
 
-#define REGISTER(name) \
+#define REGISTER_SUBSET(name) \
     .data_size = sizeof(struct cmp_subset_ ## name)
-#define REGISTER_INIT(name) \
+#define REGISTER_SUBSET_INIT(name) \
     .init = cmp_subset_ ## name ## _init
-#define REGISTER_ADD_NODE(name) \
+#define REGISTER_SUBSET_ADD_NODE(name) \
     .add_node = cmp_subset_ ## name ## _add_node
-#define REGISTER_FINALIZE(name) \
+#define REGISTER_SUBSET_FINALIZE(name) \
     .finalize = cmp_subset_ ## name ## _finalize
-#define REGISTER_COMPARE(name) \
+#define REGISTER_SUBSET_COMPARE(name) \
     .compare = cmp_subset_ ## name ## _compare
-#define REGISTER_SIM(name) \
+#define REGISTER_SUBSET_SIM(name) \
     .sim = cmp_subset_ ## name ## _sim
-#define REGISTER_DESTROY(name) \
+#define REGISTER_SUBSET_DESTROY(name) \
     .destroy = cmp_subset_ ## name ## _destroy
 
 
-DECLARE(container_single) {
+DECLARE_SUBSET(container_single_jump_node) {
     char _;
 };
-DECLARE_COMPARE(container_single)
+DECLARE_SUBSET_COMPARE(container_single_jump_node)
 {
     assert(!left != !right || (left->items->nel == 1 && right->items->nel == 1));
-    cmp_node_compare(left ? left->items->htable[0]->datum : NULL, right ? right->items->htable[0]->datum : NULL, diff_node);
+    cmp_node_compare(MAYBE(left, items->htable[0]->datum), MAYBE(right, items->htable[0]->datum), diff_node);
 }
 
 
-DECLARE(container_sim) {
+DECLARE_SUBSET(container_single) {
+    char _;
+};
+DECLARE_SUBSET_COMPARE(container_single)
+{
+    assert(!left != !right || (left->items->nel == 1 && right->items->nel == 1));
+    const struct cmp_node *left_node = MAYBE(left, items->htable[0]->datum);
+    const struct cmp_node *right_node = MAYBE(right, items->htable[0]->datum);
+    if (left_node && right_node) {
+        cmp_node_compare(left_node, right_node, diff_tree_append_child(diff_node, left_node, right_node));
+    } else if (left_node) {
+        diff_tree_append_diff(diff_node, DIFF_LEFT, left_node, NULL);
+    } else {
+        diff_tree_append_diff(diff_node, DIFF_RIGHT, right_node, NULL);
+    }
+}
+
+
+DECLARE_SUBSET(container_sim) {
     char _;
 };
 
@@ -97,7 +115,7 @@ static int sim_array_item_qsort_cmp(const void *a, const void *b)
     return -cmp_sim_cmp(&item1->sim, &item2->sim);
 }
 
-DECLARE_COMPARE(container_sim)
+DECLARE_SUBSET_COMPARE(container_sim)
 {
     size_t unique_left_count = 0;
     const struct cmp_node **unique_left = NULL;
@@ -121,12 +139,12 @@ DECLARE_COMPARE(container_sim)
 
     if (!unique_left_count || !unique_right_count) {
         for (size_t i = 0; i < unique_left_count; i++) {
-            diff_tree_append_diff(diff_node, DIFF_LEFT, unique_left[i]->cil_node, NULL);
+            diff_tree_append_diff(diff_node, DIFF_LEFT, unique_left[i], NULL);
         }
         for (size_t i = 0; i < unique_right_count; i++) {
-            diff_tree_append_diff(diff_node, DIFF_RIGHT, unique_right[i]->cil_node, NULL);
+            diff_tree_append_diff(diff_node, DIFF_RIGHT, unique_right[i], NULL);
         }
-        return;
+        goto free_unique;
     }
 
     struct sim_array_item *sims = mem_alloc(unique_left_count * unique_right_count * sizeof(*sims));
@@ -168,6 +186,7 @@ DECLARE_COMPARE(container_sim)
     }
 
     mem_free(sims);
+free_unique:
     mem_free(unique_left);
     mem_free(unique_right);
 }
@@ -175,17 +194,29 @@ DECLARE_COMPARE(container_sim)
 
 static const struct cmp_subset_def subset_defs[] = {
     [CIL_ROOT] = {
-        REGISTER(container_single),
-        REGISTER_COMPARE(container_single),
+        REGISTER_SUBSET(container_single_jump_node),
+        REGISTER_SUBSET_COMPARE(container_single_jump_node),
     },
     [CIL_SRC_INFO] = {
-        REGISTER(container_single),
-        REGISTER_COMPARE(container_single),
+        REGISTER_SUBSET(container_single_jump_node),
+        REGISTER_SUBSET_COMPARE(container_single_jump_node),
+    },
+    [CIL_BLOCK] = {
+        REGISTER_SUBSET(container_single),
+        REGISTER_SUBSET_COMPARE(container_single),
     },
     [CIL_OPTIONAL] = {
-        REGISTER(container_sim),
-        REGISTER_COMPARE(container_sim),
-    }
+        REGISTER_SUBSET(container_sim),
+        REGISTER_SUBSET_COMPARE(container_sim),
+    },
+    [CIL_IN] = {
+        REGISTER_SUBSET(container_sim),
+        REGISTER_SUBSET_COMPARE(container_sim),
+    },
+    [CIL_MACRO] = {
+        REGISTER_SUBSET(container_single),
+        REGISTER_SUBSET_COMPARE(container_single),
+    },
 };
 #define SUBSET_DEFS_COUNT (sizeof(subset_defs) / sizeof(*subset_defs))
 static const struct cmp_subset_def default_def = { 0 };

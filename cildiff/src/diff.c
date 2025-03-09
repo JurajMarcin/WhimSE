@@ -70,7 +70,7 @@ static void diff_print_context(enum diff_side side, const struct diff_tree_node 
 
 static void diff_print(const struct diff_tree_node *parent, const struct diff *diff, FILE *out)
 {
-    fprintf(out, "; %s found\n", diff->side == DIFF_LEFT ? "Addition" : "Deletion");
+    fprintf(out, "; %s found on line %" PRIu32 "\n", diff->side == DIFF_LEFT ? "Addition" : "Deletion", diff->node->cil_node->line);
     if (diff->decription) {
         fprintf(out, "; Description: %s\n", diff->decription);
     }
@@ -104,6 +104,9 @@ void diff_tree_print(const struct diff_tree_node *root, FILE *out)
 
 void diff_tree_destroy(struct diff_tree_node *root)
 {
+    if (!root) {
+        return;
+    }
     struct diff_tree_node *child = root->cl_head;
     while (child) {
         struct diff_tree_node *next = child->next;

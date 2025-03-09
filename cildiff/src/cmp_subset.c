@@ -2,12 +2,13 @@
 
 #include <assert.h>
 #include <error.h>
-#include <sepol/policydb/hashtab.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 
+#include <cil_internal.h>
 #include <sepol/errcodes.h>
+#include <sepol/policydb/hashtab.h>
 
 #include "cmp_common.h"
 #include "cmp_node.h"
@@ -40,7 +41,8 @@ void cmp_subset_add_node(struct cmp_subset *subset, struct cmp_node *node)
     const struct cmp_subset_def *def = cmp_subset_get_def(subset->flavor);
     int rc = hashtab_insert(subset->items, node->full_hash, node);
     if (rc == SEPOL_EEXIST) {
-        error(0, 0, "cmp_subset_add_node: Found duplicate rule in block");
+        // const struct cmp_node *duplicate = hashtab_search(subset->items, node->full_hash);
+        // error(0, 0, "cmp_subset_add_node: Found duplicate rule of type %d (%s) at line %d with rule at line %d", node->cil_node->flavor, cil_node_to_string(node->cil_node), node->cil_node->line, duplicate->cil_node->line);
         cmp_node_destroy(node);
         return;
     } else if (rc) {
@@ -118,7 +120,7 @@ static int subset_compare_map(hashtab_key_t key, hashtab_datum_t datum, void *op
 
     const struct cmp_node *other_node = hashtab_search(MAYBE(args->other_side, items), this_node->full_hash);
     if (!other_node) {
-        diff_tree_append_diff(args->diff_node, args->this_side, this_node->cil_node, NULL);
+        diff_tree_append_diff(args->diff_node, args->this_side, this_node, NULL);
     }
 
     return 0;
@@ -175,6 +177,8 @@ static int subset_sim_map(hashtab_key_t key, hashtab_datum_t datum, void *opaque
         case DIFF_RIGHT:
             args->sim->right++;
             break;
+        default:
+            assert(false /* unreachable */);
         }
     }
 
@@ -224,6 +228,9 @@ static int subset_destroy_map(hashtab_key_t key, hashtab_datum_t datum, void *op
 
 void cmp_subset_destroy(struct cmp_subset *subset)
 {
+    if (!subset) {
+        return;
+    }
     const struct cmp_subset_def *def = cmp_subset_get_def(subset->flavor);
     if (def->destroy) {
         def->destroy(subset);

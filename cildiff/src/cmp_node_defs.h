@@ -18,7 +18,7 @@ struct cmp_node_def {
     size_t data_size;
 };
 
-const struct cmp_node_def *cmp_node_get_def(struct cil_node *cil_node);
+const struct cmp_node_def *cmp_node_get_def(const struct cil_tree_node *cil_node);
 
 const struct cmp_set *cmp_node_src_info_items(const struct cmp_node *node);
 
