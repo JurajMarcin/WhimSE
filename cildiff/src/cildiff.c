@@ -4,8 +4,6 @@
 
 #include <error.h>
 
-#include <bzlib.h>
-
 #include <sepol/errcodes.h>
 #include <cil/cil.h>
 #include <cil_build_ast.h>
@@ -15,6 +13,7 @@
 #include "cmp_common.h"
 #include "cmp_node.h"
 #include "diff.h"
+#include "json.h"
 #include "options.h"
 
 
@@ -40,47 +39,57 @@ exit:
 
 int main(int argc, char *argv[])
 {
-    int rc = EXIT_FAILURE;
+    int exit_status = EXIT_FAILURE;
 
-    struct options cli_options = {0};
-    if (parse_options(argc, argv, &cli_options))
+    struct options options = {0};
+    int rc = parse_options(argc, argv, &options);
+    if (rc) {
+        if (rc > 0)
+            exit_status = EXIT_SUCCESS;
         goto exit;
+    }
 
     cil_db_t *left_db;
     cil_db_init(&left_db);
     cil_db_t *right_db;
     cil_db_init(&right_db);
 
-    if (load_cil_file(left_db, cli_options.left_path))
+    if (load_cil_file(left_db, options.left_path))
         goto free_cil_db;
-    if (load_cil_file(right_db, cli_options.right_path))
+    if (load_cil_file(right_db, options.right_path))
         goto free_cil_db;
 
-    printf("; Left hash: ");
-    for (size_t i = 0; i < HASH_SIZE; i++) {
-        printf("%02hhx", left_root->full_hash[i]);
     struct cmp_node *left_root = cmp_node_create(left_db->ast->root);
     struct cmp_node *right_root = cmp_node_create(right_db->ast->root);
+    if (!options.json) {
+        printf("; Left hash: ");
+        for (size_t i = 0; i < HASH_SIZE; i++) {
+            printf("%02hhx", (unsigned char)left_root->full_hash[i]);
+        }
+        putchar('\n');
+        printf("; Right hash: ");
+        for (size_t i = 0; i < HASH_SIZE; i++) {
+            printf("%02hhx", (unsigned char)right_root->full_hash[i]);
+        }
+        putchar('\n');
     }
-    putchar('\n');
-    printf("; Right hash: ");
-    for (size_t i = 0; i < HASH_SIZE; i++) {
-        printf("%02hhx", right_root->full_hash[i]);
-    }
-    putchar('\n');
 
     struct diff_tree_node *diff_root = diff_tree_create(left_root, right_root);
     cmp_node_compare(left_root, right_root, diff_root);
-    diff_tree_print(diff_root, stdout);
+    if (options.json) {
+        json_print_diff_tree(diff_root, options.json_pretty, stdout);
+    } else {
+        diff_tree_print(diff_root, stdout);
+    }
 
     diff_tree_destroy(diff_root);
     cmp_node_destroy(left_root);
     cmp_node_destroy(right_root);
-    rc = EXIT_SUCCESS;
+    exit_status = EXIT_SUCCESS;
 
 free_cil_db:
     cil_db_destroy(&right_db);
     cil_db_destroy(&left_db);
 exit:
-    return rc;
+    return exit_status;
 }

@@ -2,6 +2,8 @@
 #define CLI_OPTIONS_H
 
 struct options {
+    bool json;
+    bool json_pretty;
     const char *left_path;
     const char *right_path;
 };
