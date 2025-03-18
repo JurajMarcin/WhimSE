@@ -1,4 +1,4 @@
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import Field, dataclass, field, fields
 from pathlib import Path
 
@@ -14,8 +14,12 @@ class LocalPolicyModifications:
     booleans: frozenset[Boolean] = field(
         metadata={"file": "active/booleans.local", "const": Boolean.parse}
     )
-    file_contexts: frozenset[FileContext] = field(
-        metadata={"file": "active/file_context.local", "const": FileContext.parse}
+    file_contexts: tuple[FileContext, ...] = field(
+        metadata={
+            "file": "active/file_contexts.local",
+            "const": FileContext.parse,
+            "cont": tuple,
+        }
     )
     interfaces: frozenset[str] = field(metadata={"file": "active/interfaces.local"})
     nodes: frozenset[str] = field(metadata={"file": "active/nodes.local"})
@@ -31,29 +35,28 @@ class LocalPolicyModifications:
     )
 
     @staticmethod
-    def _read_frozenset_field[
-        T
-    ](policy_store: Path, field: Field[frozenset[T]]) -> frozenset[T]:
-        const: Callable[[str], T] = field.metadata.get("const", str)
+    def _read_data_field[CT, T](policy_store: Path, data_field: Field[CT]) -> CT:
+        const: Callable[[str], T] = data_field.metadata.get("const", str)
+        cont: Callable[[Iterable[T]], CT] = data_field.metadata.get("cont", frozenset)
         try:
             with open(
-                policy_store / field.metadata["file"], "r", encoding="locale"
+                policy_store / data_field.metadata["file"], "r", encoding="locale"
             ) as file:
-                return frozenset(
+                return cont(
                     const(line.strip())
                     for line in file
                     if line.strip() and not line.strip().startswith("#")
                 )
         except FileNotFoundError:
-            return frozenset()
+            return cont(())
 
     @staticmethod
     def read(policy_store: Path) -> "LocalPolicyModifications":
         _logger.verbose("Reading local policy modifications")
         return LocalPolicyModifications(
             *(
-                LocalPolicyModifications._read_frozenset_field(policy_store, field)
-                for field in fields(LocalPolicyModifications)
+                LocalPolicyModifications._read_data_field(policy_store, data_field)
+                for data_field in fields(LocalPolicyModifications)
             )
         )
 
