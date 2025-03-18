@@ -369,13 +369,13 @@ DEFINE_JSON_NODE_TYPE(avrulex, struct cil_avrule)
     assert(avrulex->is_extended);
     switch (avrulex->rule_kind) {
     case CIL_AVRULE_ALLOWED:
-        return CIL_KEY_ALLOW;
+        return CIL_KEY_ALLOWX;
     case CIL_AVRULE_AUDITALLOW:
-        return CIL_KEY_AUDITALLOW;
+        return CIL_KEY_AUDITALLOWX;
     case CIL_AVRULE_DONTAUDIT:
-        return CIL_KEY_DONTAUDIT;
+        return CIL_KEY_DONTAUDITX;
     case CIL_AVRULE_NEVERALLOW:
-        return CIL_KEY_NEVERALLOW;
+        return CIL_KEY_NEVERALLOWX;
     }
     assert(false /* unreachable */);
 }
