@@ -3,6 +3,7 @@ from dataclasses import fields
 from difflib import SequenceMatcher
 
 from whimse.config import Config
+from whimse.detect.modules import PolicyModulesChangeDetector
 from whimse.explore.actual.types import ActualPolicy
 from whimse.explore.common import LocalPolicyModifications
 from whimse.explore.distributed.types import DistPolicy
@@ -134,6 +135,11 @@ class PolicyChangesDetector:
                 ), f"Invalid container types {type(actual_statements)=} {type(dist_statements)=}"
             yield report
 
+    def _detect_module_changes(self) -> Iterable[BaseReport]:
+        return PolicyModulesChangeDetector(
+            self._config, self._actual_policy, self._dist_policy
+        ).detect_changes()
+
     def detect_changes(self) -> Iterable[ReportItem | BaseReport]:
         _logger.info("Checking changes in policy settings")
         if (
@@ -150,3 +156,4 @@ class PolicyChangesDetector:
             )
 
         yield from self._detect_localmod_changes()
+        yield from self._detect_module_changes()
