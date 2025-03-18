@@ -255,7 +255,7 @@ static void json_print_expr(int indent, FILE *output, const struct cil_list *exp
             json_print_string(output, item->data);
             break;
         case CIL_CONS_OPERAND:
-            json_print_string(output, *(expr_op_keys[(uintptr_t)head->data]));
+            json_print_string(output, *(expr_op_keys[(uintptr_t)item->data]));
             break;
         case CIL_LIST:
             json_print_expr(indent, output, item->data);
