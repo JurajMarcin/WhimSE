@@ -1,7 +1,8 @@
 from collections.abc import Iterable
 
+from whimse.config import Config
 from whimse.explore.distributed.types import Package, PolicyModuleSource
-from whimse.explore.types import ExploreStageConfig, ExploreStageError
+from whimse.explore.types import ExploreStageError
 from whimse.selinux import PolicyModule
 from whimse.utils.logging import get_logger
 
@@ -9,8 +10,8 @@ _logger = get_logger(__name__)
 
 
 class PackageManager:
-    def __init__(self, explore_config: ExploreStageConfig) -> None:
-        self._explore_config = explore_config
+    def __init__(self, config: Config) -> None:
+        self._config = config
 
     def find_selinux_modules(self) -> Iterable[tuple[PolicyModule, PolicyModuleSource]]:
         raise NotImplementedError()

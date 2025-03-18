@@ -18,13 +18,13 @@ from rpm import (  # pylint: disable=no-name-in-module
     rpm,
 )
 
+from whimse.config import Config
 from whimse.explore.distributed.pm.common import FetchPackageError, PackageManager
 from whimse.explore.distributed.types import (
     Package,
     PolicyModuleInstallMethod,
     PolicyModuleSource,
 )
-from whimse.explore.types import ExploreStageConfig
 from whimse.selinux import PolicyModule, PolicyModuleLang
 from whimse.utils.logging import get_logger
 from whimse.utils.semodule import list_semodule_installs
@@ -52,13 +52,13 @@ class DNFPackageManager(PackageManager):
         dnf_process = run(["dnf", "--version"], check=False, logger=_logger)
         return rpm_process.returncode == 0 and dnf_process.returncode == 0
 
-    def __init__(self, explore_config: ExploreStageConfig) -> None:
-        super().__init__(explore_config)
+    def __init__(self, config: Config) -> None:
+        super().__init__(config)
         self._store_module_pattern = re.compile(
-            rf"^{re.escape(str(explore_config.policy_store_path).rstrip('/'))}"
+            rf"^{re.escape(str(config.policy_store_path).rstrip('/'))}"
             rf"\/active\/modules\/(?P<priority>\d+)\/(?P<module_name>[^\/]+)$"
         )
-        self._rpms_cache_path = self._explore_config.shadow_root_path / ".rpms"
+        self._rpms_cache_path = self._config.shadow_root_path / ".rpms"
 
     def _rpm_package_to_package(self, rpm_package) -> Package:
         return Package(
@@ -95,7 +95,7 @@ class DNFPackageManager(PackageManager):
                     # Module directory contains module files
                     module_files: list[tuple[PolicyModuleLang, str]] = []
                     disabled_file = str(
-                        self._explore_config.policy_store_path
+                        self._config.policy_store_path
                         / "active/modules/disabled"
                         / name
                     )
@@ -332,7 +332,7 @@ class DNFPackageManager(PackageManager):
         )
         run(
             f"rpm2cpio {rpm_path} | cpio -imd {shlex.join(files_list)}",
-            cwd=self._explore_config.shadow_root_path,
+            cwd=self._config.shadow_root_path,
             shell=True,
             check=True,
             logger=_logger,

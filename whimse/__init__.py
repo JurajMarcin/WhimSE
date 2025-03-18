@@ -3,9 +3,9 @@ from pathlib import Path
 from sys import stderr
 from tempfile import mkdtemp
 
+from whimse.config import Config, ModuleFetchMethod
 from whimse.detect import PolicyChangesDetector
 from whimse.explore import explore_stage
-from whimse.explore.types import ExploreStageConfig, ModuleFetchMethod
 from whimse.report.types import Report
 from whimse.utils.logging import get_logger
 
@@ -20,17 +20,17 @@ def main() -> None:
 
     tmpdir = mkdtemp()
     print(tmpdir)
-    explore_stage_result = explore_stage(
-        ExploreStageConfig(
-            Path("/var/lib/selinux/targeted"),
-            Path(tmpdir),
-            [
-                ModuleFetchMethod.LOCAL_MODULE,
-                ModuleFetchMethod.EXACT_PACKAGE,
-                ModuleFetchMethod.NEWER_PACKAGE,
-            ],
-        )
+    config = Config(
+        Path("./cildiff/src/cildiff"),
+        Path("/var/lib/selinux/targeted"),
+        Path(tmpdir),
+        [
+            ModuleFetchMethod.LOCAL_MODULE,
+            ModuleFetchMethod.EXACT_PACKAGE,
+            ModuleFetchMethod.NEWER_PACKAGE,
+        ],
     )
+    explore_stage_result = explore_stage(config)
 
     with open("dist_policy.txt", "w") as f:
         for module, source in explore_stage_result.dist_policy.modules.items():

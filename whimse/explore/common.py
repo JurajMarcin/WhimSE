@@ -2,7 +2,7 @@ from collections.abc import Callable
 from dataclasses import Field, dataclass, field, fields
 from pathlib import Path
 
-from whimse.explore.types import ExploreStageConfig
+from whimse.config import Config
 from whimse.selinux import Boolean, FileContext, SelinuxUser, User, UserLabelingPrefix
 from whimse.utils.logging import get_logger
 
@@ -59,5 +59,5 @@ class LocalPolicyModifications:
 
 
 class PolicyExplorer:
-    def __init__(self, explore_config: ExploreStageConfig) -> None:
-        self._explore_config = explore_config
+    def __init__(self, config: Config) -> None:
+        self._config = config

@@ -11,7 +11,7 @@ _logger = get_logger(__name__)
 
 class ActualPolicyExplorer(PolicyExplorer):
     def _get_policy_modules(self) -> Iterable[PolicyModule]:
-        modules_path = self._explore_config.policy_store_path / "active" / "modules"
+        modules_path = self._config.policy_store_path / "active" / "modules"
         disabled_path = modules_path / "disabled"
         for priority in listdir(modules_path):
             if not priority.isdigit():
@@ -45,6 +45,6 @@ class ActualPolicyExplorer(PolicyExplorer):
         _logger.info("Gathering facts about actual system policy")
         return ActualPolicy(
             frozenset(self._get_policy_modules()),
-            LocalPolicyModifications.read(self._explore_config.policy_store_path),
-            (self._explore_config.policy_store_path / "disable_dontaudit").is_file(),
+            LocalPolicyModifications.read(self._config.policy_store_path),
+            (self._config.policy_store_path / "disable_dontaudit").is_file(),
         )

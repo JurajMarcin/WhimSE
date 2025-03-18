@@ -2,6 +2,7 @@ import shutil
 from collections.abc import Iterable
 from dataclasses import fields
 
+from whimse.config import Config, ModuleFetchMethod
 from whimse.explore.common import LocalPolicyModifications, PolicyExplorer
 from whimse.explore.distributed.pm import system_package_manager_factory
 from whimse.explore.distributed.pm.common import FetchPackageError
@@ -11,9 +12,7 @@ from whimse.explore.distributed.types import (
     PolicyModuleSource,
 )
 from whimse.explore.types import (
-    ExploreStageConfig,
     ExploreStageError,
-    ModuleFetchMethod,
 )
 from whimse.selinux import PolicyModule
 from whimse.utils.logging import get_logger
@@ -22,9 +21,9 @@ _logger = get_logger(__name__)
 
 
 class DistPolicyExplorer(PolicyExplorer):
-    def __init__(self, explore_config: ExploreStageConfig) -> None:
-        super().__init__(explore_config)
-        self._package_manager = system_package_manager_factory(explore_config)
+    def __init__(self, config: Config) -> None:
+        super().__init__(config)
+        self._package_manager = system_package_manager_factory(config)
 
     def _fetch_dist_files(
         self, modules: Iterable[tuple[PolicyModule, PolicyModuleSource]]
@@ -36,7 +35,7 @@ class DistPolicyExplorer(PolicyExplorer):
             else:
                 yield module, source
 
-        for fetch_method in self._explore_config.module_fetch_methods:
+        for fetch_method in self._config.module_fetch_methods:
             if fetch_method == ModuleFetchMethod.LOCAL_MODULE:
                 for source, source_modules in modules_by_source.items():
                     if (
@@ -52,8 +51,7 @@ class DistPolicyExplorer(PolicyExplorer):
                         try:
                             for _, file in module.files:
                                 target_file = (
-                                    self._explore_config.shadow_root_path
-                                    / file.lstrip("/")
+                                    self._config.shadow_root_path / file.lstrip("/")
                                 )
                                 target_file.parent.mkdir(exist_ok=True, parents=True)
                                 shutil.copy(file, target_file)
@@ -119,10 +117,10 @@ class DistPolicyExplorer(PolicyExplorer):
         _logger.verbose("Fetching local modification files and disable_dontaudit status")
         self._package_manager.fetch_files(
             [
-                str(self._explore_config.policy_store_path / field.metadata["file"])
+                str(self._config.policy_store_path / field.metadata["file"])
                 for field in fields(LocalPolicyModifications)
             ]
-            + [str(self._explore_config.policy_store_path / "disable_dontaudit")],
+            + [str(self._config.policy_store_path / "disable_dontaudit")],
             require_exact_version=False,
             notowned_ok=True,
         )
@@ -130,11 +128,7 @@ class DistPolicyExplorer(PolicyExplorer):
 
         return DistPolicy(
             modules,
-            LocalPolicyModifications.read(
-                self._explore_config.shadow_policy_store_path
-            ),
-            (
-                self._explore_config.shadow_policy_store_path / "disable_dontaudit"
-            ).is_file(),
-            self._explore_config.shadow_root_path,
+            LocalPolicyModifications.read(self._config.shadow_policy_store_path),
+            (self._config.shadow_policy_store_path / "disable_dontaudit").is_file(),
+            self._config.shadow_root_path,
         )
