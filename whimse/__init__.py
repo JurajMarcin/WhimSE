@@ -33,8 +33,8 @@ def main() -> None:
     explore_stage_result = explore_stage(config)
 
     with open("dist_policy.txt", "w") as f:
-        for module, source in explore_stage_result.dist_policy.modules.items():
-            print(module, source, file=f)
+        for dist_module in explore_stage_result.dist_policy.modules:
+            print(dist_module, file=f)
         print(explore_stage_result.dist_policy.local_modifications, file=f)
         print(f"{explore_stage_result.dist_policy.dontaudit_disabled=}", file=f)
     with open("actual_policy.txt", "w") as f:
