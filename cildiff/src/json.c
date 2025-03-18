@@ -789,7 +789,9 @@ DEFINE_JSON_NODE(defaultrange, struct cil_defaultrange)
     case CIL_DEFAULT_TARGET_HIGH:
     case CIL_DEFAULT_TARGET_LOW_HIGH:
         default_str = CIL_KEY_TARGET;
+        break;
     case CIL_DEFAULT_GLBLUB:
+        default_str = CIL_KEY_GLBLUB;
         break;
     }
     const char *range_str = NULL;
@@ -807,7 +809,7 @@ DEFINE_JSON_NODE(defaultrange, struct cil_defaultrange)
         range_str = CIL_KEY_LOW_HIGH;
         break;
     case CIL_DEFAULT_GLBLUB:
-        range_str = CIL_KEY_GLBLUB;
+        range_str = NULL;
         break;
     }
     json_print_kv(indent, output, "default", "%s", default_str);
