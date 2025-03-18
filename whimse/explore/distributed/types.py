@@ -12,6 +12,9 @@ class Package:
     name: str
     version: str
 
+    def __str__(self) -> str:
+        return self.full_name
+
 
 class PolicyModuleInstallMethod(Enum):
     DIRECT = "direct"
@@ -31,9 +34,15 @@ class PolicyModuleSource:
         )
 
 
-@dataclass()
+@dataclass(frozen=True)
+class DistPolicyModule:
+    module: PolicyModule
+    source: PolicyModuleSource
+
+
+@dataclass(frozen=True)
 class DistPolicy:
-    modules: dict[PolicyModule, PolicyModuleSource]
+    modules: frozenset[DistPolicyModule]
     local_modifications: LocalPolicyModifications
     dontaudit_disabled: bool
 

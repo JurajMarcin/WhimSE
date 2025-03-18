@@ -21,6 +21,7 @@ from rpm import (  # pylint: disable=no-name-in-module
 from whimse.config import Config
 from whimse.explore.distributed.pm.common import FetchPackageError, PackageManager
 from whimse.explore.distributed.types import (
+    DistPolicyModule,
     Package,
     PolicyModuleInstallMethod,
     PolicyModuleSource,
@@ -192,7 +193,7 @@ class DNFPackageManager(PackageManager):
 
         return package_modules
 
-    def find_selinux_modules(self) -> Iterable[tuple[PolicyModule, PolicyModuleSource]]:
+    def find_selinux_modules(self) -> Iterable[DistPolicyModule]:
         ts = rpm.TransactionSet()
         for rpm_package in ts.dbMatch():
             package = self._rpm_package_to_package(rpm_package)
@@ -210,11 +211,14 @@ class DNFPackageManager(PackageManager):
                     rpm_package[RPMTAG_POSTIN], package_modules, package
                 )
             yield from (
-                (module, PolicyModuleSource(PolicyModuleInstallMethod.DIRECT, package))
+                DistPolicyModule(
+                    module,
+                    PolicyModuleSource(PolicyModuleInstallMethod.DIRECT, package),
+                )
                 for module in package_modules.direct
             )
             yield from (
-                (
+                DistPolicyModule(
                     module,
                     PolicyModuleSource(PolicyModuleInstallMethod.SEMODULE, package),
                 )
@@ -227,7 +231,7 @@ class DNFPackageManager(PackageManager):
                     package.name,
                 )
                 yield from (
-                    (
+                    DistPolicyModule(
                         PolicyModule(name, priority, False, frozenset()),
                         PolicyModuleSource(
                             PolicyModuleInstallMethod.UNKNOWN,
@@ -243,7 +247,7 @@ class DNFPackageManager(PackageManager):
                     package.name,
                 )
                 yield from (
-                    (
+                    DistPolicyModule(
                         PolicyModule(
                             name,
                             -1,
