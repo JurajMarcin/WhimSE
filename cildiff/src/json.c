@@ -239,12 +239,12 @@ static void json_print_expr(int indent, FILE *output, const struct cil_list *exp
     indent = json_object_start(indent, output);
 
     const struct cil_list_item *head = MAYBE(expr, head);
-    const char *op_str = "list";
+    const char *operator_str = NULL;
     if (head && head->flavor == CIL_OP) {
-        op_str = *(expr_op_keys[(uintptr_t)head->data]);
+        operator_str = *(expr_op_keys[(uintptr_t)head->data]);
         head = head->next;
     }
-    json_print_kv(indent, output, "op", "%s", op_str);
+    json_print_kv(indent, output, "operator", "%s", operator_str);
     json_print_next(output);
     json_print_kv(indent, output, "operands", NULL);
     indent = json_array_start(indent, output);
