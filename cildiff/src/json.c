@@ -1202,7 +1202,15 @@ DEFINE_JSON_NODE(expandtypeattribute, struct cil_expandtypeattribute)
 {
     (void)cil_node;
     json_print_kv(indent, output, "types", NULL);
-    json_print_expr(indent, output, expandtypeattribute->attr_strs);
+    indent = json_array_start(indent, output);
+    for (const struct cil_list_item *item = expandtypeattribute->attr_strs->head; item; item = item->next) {
+        assert(item->flavor == CIL_STRING);
+        json_print_string(output, item->data);
+        if (item->next) {
+            json_print_next(output);
+        }
+    }
+    indent = json_array_end(indent, output);
     json_print_next(output);
     json_print_kv(indent, output, "expand", "%b", expandtypeattribute->expand);
 }
