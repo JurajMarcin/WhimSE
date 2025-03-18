@@ -1555,7 +1555,7 @@ static void json_print_diff(int indent, FILE *output, const struct diff *diff)
     json_print_kv(indent, output, "hash", NULL);
     json_print_hash(output, diff->node->full_hash);
     json_print_next(output);
-    json_print_kv(indent, output, "description", "%s", diff->decription ? diff->decription : "");
+    json_print_kv(indent, output, "description", "%s", diff->decription);
     json_print_next(output);
     json_print_kv(indent, output, "node", NULL);
     json_print_cil_node(indent, output, diff->node->cil_node);
