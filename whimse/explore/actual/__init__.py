@@ -44,7 +44,7 @@ class ActualPolicyExplorer(PolicyExplorer):
     def get_actual_policy(self) -> ActualPolicy:
         _logger.info("Gathering facts about actual system policy")
         return ActualPolicy(
-            set(self._get_policy_modules()),
+            frozenset(self._get_policy_modules()),
             LocalPolicyModifications.read(self._explore_config.policy_store_path),
             (self._explore_config.policy_store_path / "disable_dontaudit").is_file(),
         )

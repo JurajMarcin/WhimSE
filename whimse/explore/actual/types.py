@@ -4,8 +4,8 @@ from whimse.explore.common import LocalPolicyModifications
 from whimse.selinux import PolicyModule
 
 
-@dataclass()
+@dataclass(frozen=True)
 class ActualPolicy:
-    modules: set[PolicyModule]
+    modules: frozenset[PolicyModule]
     local_modifications: LocalPolicyModifications
     dontaudit_disabled: bool
