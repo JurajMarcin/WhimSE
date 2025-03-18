@@ -46,7 +46,7 @@ def main() -> None:
     report = Report()
     report.add_items(
         PolicyChangesDetector(
-            explore_stage_result.actual_policy, explore_stage_result.dist_policy
+            config, explore_stage_result.actual_policy, explore_stage_result.dist_policy
         ).detect_changes()
     )
 
