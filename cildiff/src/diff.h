@@ -1,6 +1,9 @@
 #ifndef DIFF_H
 #define DIFF_H
 
+struct diff_tree_node;
+
+
 #include <stdio.h>
 
 #include "cmp_node.h"
