@@ -19,6 +19,7 @@
 #include "diff.h"
 #include "utils.h"
 
+
 /* JSON Utils */
 
 static int inc_indent(int indent)
@@ -101,12 +102,6 @@ static void json_print_kv(int indent, FILE *output, const char *key, const char 
         return;
     }
     va_list args;
-    // size_t args_count = 0;
-    // for (const char *c = key; *c; c++) {
-    //     if (*c == '%' && *(c + 1) != '%') {
-    //         args_count++;
-    //     }
-    // }
     va_start(args);
     va_list tmp_args;
     va_copy(tmp_args, args);

@@ -3,6 +3,7 @@
 
 #include "cmp_subset.h"
 
+
 typedef void (*cmp_subset_init_fn)(struct cmp_subset *subset);
 typedef void (*cmp_subset_add_node_fn)(struct cmp_subset *subset, struct cmp_node *node);
 typedef bool (*cmp_subset_finalize_fn)(struct cmp_subset *subset);

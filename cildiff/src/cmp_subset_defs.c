@@ -1,12 +1,12 @@
 #include "cmp_subset_defs.h"
 
 #include <assert.h>
-
-#include <sepol/policydb/hashtab.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include "cil_flavor.h"
+#include <sepol/policydb/hashtab.h>
+#include <cil_flavor.h>
+
 #include "cmp_common.h"
 #include "cmp_node.h"
 #include "cmp_subset.h"

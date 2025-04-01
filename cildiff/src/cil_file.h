@@ -3,6 +3,7 @@
 
 #include <cil/cil.h>
 
+
 struct cil_file {
     const char *path;
     size_t data_len;
@@ -13,4 +14,4 @@ int cil_file_read(const char *path, struct cil_file *cil_file);
 
 void cil_file_destroy(struct cil_file *cil_file);
 
-#endif // !CILFILE_H
+#endif

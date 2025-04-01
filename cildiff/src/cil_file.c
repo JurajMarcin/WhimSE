@@ -1,15 +1,17 @@
 #include "cil_file.h"
 
 #include <error.h>
-
-#include <bzlib.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+#include <bzlib.h>
+
+
 #define BZ2_MAGICSTR "BZh"
 #define BZ2_MAGICLEN (sizeof(BZ2_MAGICSTR)-1)
+
 
 static int read_compressed_file(size_t file_start_len,
                                 char file_start[file_start_len], FILE *file,

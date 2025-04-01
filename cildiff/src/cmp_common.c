@@ -1,12 +1,14 @@
 #include "cmp_common.h"
-#include "mem.h"
 
 #include <error.h>
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 
 #include <openssl/evp.h>
-#include <time.h>
+
+#include "mem.h"
+
 
 void cmp_hash(size_t data_len, const void *data, char hash[HASH_SIZE])
 {

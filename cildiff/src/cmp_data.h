@@ -2,9 +2,10 @@
 #define CMP_DATA_H
 
 #include <cil_internal.h>
+#include <cil_flavor.h>
 
-#include "cil_flavor.h"
 #include "cmp_common.h"
+
 
 struct cmp_data {
     enum cil_flavor flavor;

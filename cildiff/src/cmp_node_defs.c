@@ -6,8 +6,8 @@
 
 #include <cil_internal.h>
 #include <cil_flavor.h>
+#include <cil_tree.h>
 
-#include "cil_tree.h"
 #include "cmp_common.h"
 #include "cmp_data.h"
 #include "cmp_node.h"

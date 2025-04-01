@@ -2,8 +2,8 @@
 
 #include <errno.h>
 #include <error.h>
-#include <stdlib.h>
 #include <string.h>
+
 
 inline void __mem_check(void *mem, const char *verb, const char *file, int line)
 {
@@ -11,7 +11,6 @@ inline void __mem_check(void *mem, const char *verb, const char *file, int line)
         error(EXIT_FAILURE, errno, "Failed to %s memory at %s:%d", verb, file, line);
     }
 }
-
 
 inline void *__mem_alloc(size_t size, const char *file, int line)
 {

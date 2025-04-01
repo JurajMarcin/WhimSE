@@ -5,8 +5,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <openssl/evp.h>
-
 #include <sepol/policydb/hashtab.h>
 #include <cil/cil.h>
 #include <cil_tree.h>

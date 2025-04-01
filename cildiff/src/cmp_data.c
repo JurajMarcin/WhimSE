@@ -2,13 +2,13 @@
 
 #include <assert.h>
 #include <error.h>
-
-#include <cil_internal.h>
-#include <cil_list.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include "cil_flavor.h"
+#include <cil_internal.h>
+#include <cil_flavor.h>
+#include <cil_list.h>
+
 #include "cmp_common.h"
 #include "mem.h"
 
