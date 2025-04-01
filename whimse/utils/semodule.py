@@ -2,10 +2,7 @@ import re
 from argparse import ArgumentParser
 from collections.abc import Iterable
 
-from whimse.utils.logging import get_logger
 from whimse.utils.shell import get_command_executions
-
-_logger = get_logger(__name__)
 
 _SEMODULE_ARG_PARSER = ArgumentParser()
 # Default libsemodule priority is 400

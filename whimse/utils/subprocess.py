@@ -1,8 +1,7 @@
 import shlex
 import subprocess
 from functools import wraps
-
-from whimse.utils.logging import Logger
+from logging import Logger
 
 
 @wraps(subprocess.run)
@@ -13,7 +12,10 @@ def run(
     **outer_kwargs,
 ):
     def _run(*args, stdout=None, stderr=None, **kwargs):
-        logger.verbose("Executing: %r", shlex.join(map(str, args[0])) if isinstance(args[0], list) else args[0])
+        logger.debug(
+            "Executing: %r",
+            shlex.join(map(str, args[0])) if isinstance(args[0], list) else args[0],
+        )
         try:
             return subprocess.run(
                 *args,
@@ -23,7 +25,12 @@ def run(
                 **kwargs,
             )
         except subprocess.CalledProcessError as ex:
-            logger.verbose("Execution failed with code %d stdout=%r stderr=%r", ex.returncode, ex.stdout, ex.stderr)
+            logger.debug(
+                "Execution failed with code %d stdout=%r stderr=%r",
+                ex.returncode,
+                ex.stdout,
+                ex.stderr,
+            )
             raise
 
     return _run(*outer_args, **outer_kwargs)
