@@ -20,24 +20,20 @@ def main() -> None:
         getLogger(vf).setLevel(level)
     _logger.debug("%r", config)
 
-    explore_stage_result = explore_stage(config)
-
-    with open("dist_policy.txt", "w") as f:
-        for dist_module in explore_stage_result.dist_policy.modules:
-            print(dist_module, file=f)
-        print(explore_stage_result.dist_policy.local_modifications, file=f)
-        print(f"{explore_stage_result.dist_policy.dontaudit_disabled=}", file=f)
-    with open("actual_policy.txt", "w") as f:
-        for module in explore_stage_result.actual_policy.modules:
-            print(module, file=f)
-        print(explore_stage_result.actual_policy.local_modifications, file=f)
-        print(f"{explore_stage_result.actual_policy.dontaudit_disabled=}", file=f)
-
-    report = Report()
-    report.add_items(
-        PolicyChangesDetector(
-            config, explore_stage_result.actual_policy, explore_stage_result.dist_policy
-        ).detect_changes()
-    )
-
-    print(report)
+    try:
+        if config.input:
+            report = JSONReportFormattter.load_report(config.input)
+        else:
+            actual_policy, dist_policy = explore_stage(config)
+            report = PolicyChangesDetector(
+                config, actual_policy, dist_policy
+            ).get_report()
+            AnalysisRunner(config).run_analyses(report)
+        report_formatter = report_formatter_factory(config, report)
+        report_formatter.format_report(config.output)
+    finally:
+        if config.keep_work_dir:
+            _logger.info("Keeping the working directory '%s'", config.work_dir)
+        else:
+            _logger.debug("Removing the working directory '%s", config.work_dir)
+            rmtree(config.work_dir)

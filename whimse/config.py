@@ -11,6 +11,8 @@ from typing import Any, TextIO
 
 from selinux import selinux_getpolicytype
 
+from whimse.types.reports import ReportFormat
+
 
 class ExtendListAction(Action):
     def __call__(
@@ -46,6 +48,11 @@ class Config:
     policy_store_path: Path
     module_fetch_methods: tuple[ModuleFetchMethod, ...]
 
+    input: TextIO | None
+    report_format: ReportFormat
+    output: TextIO
+    full_report: bool
+    show_lookalikes: bool
     @property
     def shadow_root_path(self) -> Path:
         return self.work_dir / "root"
@@ -161,6 +168,44 @@ class Config:
             "Equivalent to '--module-fetch newer'.",
         )
 
+        report_options = parser.add_argument_group("Report options")
+        report_options.add_argument(
+            "--input",
+            action="store",
+            type=FileType("r", encoding="locale"),
+            default=None,
+            help="Instead of analysing the current policy, "
+            "load JSON formatted report from this file and output it in another format.",
+        )
+        report_options.add_argument(
+            "--format",
+            action="store",
+            type=ReportFormat,
+            default=ReportFormat.PLAIN,
+            help="Report format, possible values: plain, json, html\nDefault: plain",
+        )
+        report_options.add_argument(
+            "--output",
+            action="store",
+            type=FileType("w", encoding="locale"),
+            default=stdout,
+            help="Output the report to this file.\nDefault: stdout",
+        )
+        report_options.add_argument(
+            "--full-report",
+            action="store_true",
+            default=False,
+            help="Output full report including unchanged local modifications files and policy "
+            "modules. Applicable to plain or html report format.",
+        )
+        report_options.add_argument(
+            "--show-lookalikes",
+            action="store_true",
+            default=False,
+            help="Show policy module lookalikes (package files that might be policy modules, but "
+            "their installation has not been detected) in the report. Aplicable plain or html "
+            "report format.",
+        )
         parsed_args = parser.parse_args()
 
         return Config(
@@ -179,4 +224,9 @@ class Config:
                     ModuleFetchMethod.NEWER_PACKAGE,
                 )
             ),
+            input=parsed_args.input,
+            report_format=parsed_args.format,
+            output=parsed_args.output,
+            full_report=parsed_args.full_report,
+            show_lookalikes=parsed_args.show_lookalikes,
         )

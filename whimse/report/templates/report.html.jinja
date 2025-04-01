@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8" />
+    <title>What Have I Modified in SELinux</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Red+Hat+Mono:ital,wght@0,300..700;1,300..700&family=Red+Hat+Text:ital,wght@0,300..700;1,300..700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" />
+    <style>
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+            font-size: 16px;
+            font-family: "Red Hat Text", sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        aside {
+            position: fixed;
+            top: 0;
+            left: 0;
+            background: #EEEEEE;
+            padding: 1em;
+            width: 20em;
+            height: 100vh;
+            overflow-y: scroll;
+        }
+
+        main {
+            padding: 1em;
+            margin-left: 20em;
+        }
+
+        .toc {
+            margin: 0;
+            padding-left: 1em;
+        }
+
+        .local-mod-statement,
+        .cil,
+        .preformat {
+            background: #E0E0E0;
+            font-family: "Red Hat Mono", monospace;
+            padding: 0.5em;
+            overflow-x: scroll;
+        }
+
+        .inline-icon {
+            vertical-align: bottom;
+        }
+
+        .red {
+            color: #B71C1C;
+        }
+
+        .green {
+            color: #33691E;
+        }
+
+        .yellow {
+            color: #F57F17;
+        }
+    </style>
+</head>
+
+<body>
+    <aside>
+        <h2>Table of Contents</h2>
+        <ul class="toc">
+            {% if disable_dontaudit_report._shown %}
+            <li><a href="#disable_dontaudit">Disable dontaudit</a></li>
+            {% endif %}
+            <li>
+                <a href="#local_modifications">Local Modifications</a>
+                <ul class="toc">
+                    {% for local_modifications_report in local_modifications_reports %}
+                    {% if local_modifications_report._shown %}
+                    <li>
+                        <a href="#local_modifications_report_{{ local_modifications_report._report.section }}">
+                            {{ local_modifications_report._title }}
+                        </a>
+                    </li>
+                    {% endif %}
+                    {% endfor %}
+                </ul>
+            </li>
+            <li>
+                <a href="#policy_modules">Policy Modules</a>
+                <ul class="toc">
+                    {% for policy_module_report in policy_module_reports %}
+                    {% if policy_module_report._shown %}
+                    <li>
+                        <a href="#policy_module_report_{{ policy_module_report._id }}">
+                            {{ policy_module_report._title }}
+                        </a>
+                    </li>
+                    {% endif %}
+                    {% endfor %}
+                </ul>
+            </li>
+            <li>
+                <a href="#analysis_results">Analysis Results</a>
+            </li>
+        </ul>
+    </aside>
+    <main>
+        <h1>What Have I Modified in SELinux</h1>
+        {% if disable_dontaudit_report._shown %}
+        <section id="disable_dontaudit">
+            <h2>{{ disable_dontaudit_report._title }}</h2>
+            <p>{{ disable_dontaudit_report._message }}</p>
+        </section>
+        {% endif %}
+        <section id="local_modifications">
+            <h2>Local Modifications</h2>
+            {% for local_modifications_report in local_modifications_reports %}
+            {% if local_modifications_report._shown %}
+            <section id="local_modifications_report_{{ local_modifications_report._report.section }}">
+                <h3>
+                    {{ local_modifications_report._title }}
+                    {{ local_modifications_report._added_icon }}
+                    {{ local_modifications_report._change_count[0] }}
+                    {{ local_modifications_report._deleted_icon }}
+                    {{ local_modifications_report._change_count[1] }}
+                </h3>
+                {% for change in local_modifications_report._report.changes %}
+                <p>
+                    {{ local_modifications_report._change_message(change) }}
+                <pre class="local-mod-statement">{{ change.statement|e }}</pre>
+                </p>
+                {% endfor %}
+            </section>
+            {% endif %}
+            {% endfor %}
+        </section>
+        <section id="policy_modules">
+            <h2>Policy Modules</h2>
+            {% for policy_module_report in policy_module_reports %}
+            {% if policy_module_report._shown %}
+            <section id="policy_module_report_{{ policy_module_report._id }}">
+                <h3>{{ policy_module_report._title }}</h3>
+                {% for module_source_message in policy_module_report._module_source_messages %}
+                <p>{{ module_source_message }}</p>
+                {% endfor %}
+                <p>
+                    Actual policy module files:
+                    <ul>
+                        {% for file in policy_module_report._actual_module_files %}
+                            <li>{{ file }}</li>
+                        {% endfor %}
+                    </ul>
+                </p>
+                <p>
+                    Distribution policy module files:
+                    <ul>
+                        {% for file in policy_module_report._dist_module_files %}
+                            <li>{{ file }}</li>
+                        {% endfor %}
+                    </ul>
+                </p>
+                {% if policy_module_report._effective_message %}
+                <p>{{ policy_module_report._effective_message }}</p>
+                {% endif %}
+                {% for flag_message in policy_module_report._flag_messages %}
+                <p>
+                    {{ flag_message }}
+                </p>
+                {% endfor %}
+                {% if policy_module_report._report.diff and policy_module_report._report.diff.contains_changes %}
+                <section>
+                    <h4>
+                        Changes
+                        {{ policy_module_report._added_icon }}
+                        {{ policy_module_report._change_count[0] }}
+                        {{ policy_module_report._deleted_icon }}
+                        {{ policy_module_report._change_count[1] }}
+                    </h4>
+                    {% for diff, diff_node in policy_module_report._diffs() %}
+                    <div class="diff">
+                        <p>{{ policy_module_report._diff_message(diff, diff_node) }}</p>
+                        <pre class="cil">{{ diff.node.cil_str()|e }}</pre>
+                    </div>
+                    {% endfor %}
+                </section>
+                {% endif %}
+            </section>
+            {% endif %}
+            {% endfor %}
+        </section>
+        <section id="analysis_results">
+            <h2>Analysis Results</h2>
+            {% for analysis_result in report.analysis_results %}
+                <section>
+                    <h3>{{ analysis_result.title }}</h3>
+                    {% for analysis_result_section in analysis_result.sections %}
+                    <section>
+                        <h4>{{ analysis_result_section.title }}</h4>
+                        {% for analysis_result_item in analysis_result_section.items %}
+                        {% if analysis_result_item.preformat %}
+                        <pre class="preformat">{{ analysis_result_item.text }}</pre>
+                        {% else %}
+                        <p>{{ analysis_result_item.text }}</p>
+                        {% endif %}
+                        {% endfor %}
+                    </section>
+                    {% endfor %}
+                </section>
+            {% endfor %}
+        </section>
+    </main>
+</body>
+
+</html>
