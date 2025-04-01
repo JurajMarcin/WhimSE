@@ -2,6 +2,7 @@
 #include "mem.h"
 
 #include <error.h>
+#include <stdio.h>
 #include <string.h>
 
 #include <openssl/evp.h>
@@ -78,6 +79,14 @@ int cmp_hash_cmp(const char hash1[HASH_SIZE], const char hash2[HASH_SIZE])
         return 1;
     }
     return memcmp(hash1, hash2, HASH_SIZE);
+}
+
+void cmp_hash_to_string(const char hash[HASH_SIZE], char string[HASH_SIZE * 2 + 1])
+{
+    for (size_t i = 0; i < HASH_SIZE; i++) {
+        sprintf(&string[i * 2], "%02hhx", (unsigned char)hash[i]);
+    }
+    string[HASH_SIZE * 2] = '\0';
 }
 
 unsigned int cmp_hash_hashtab_hash(hashtab_t hashtab, const_hashtab_key_t key)

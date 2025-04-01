@@ -9,6 +9,7 @@
 #include <cil_tree.h>
 #include <cil_write_ast.h>
 
+#include "cmp_common.h"
 #include "mem.h"
 
 
@@ -74,6 +75,9 @@ static void diff_print(const struct diff_tree_node *parent, const struct diff *d
     if (diff->decription) {
         fprintf(out, "; Description: %s\n", diff->decription);
     }
+    char hash_str[HASH_SIZE * 2 + 1];
+    cmp_hash_to_string(diff->node->full_hash, hash_str);
+    fprintf(out, "; Hash: %s\n", hash_str);
     fprintf(out, "; Left context:\n");
     diff_print_context(DIFF_LEFT, parent, out);
     fprintf(out, "; Right context:\n");

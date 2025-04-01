@@ -62,16 +62,11 @@ int main(int argc, char *argv[])
     struct cmp_node *left_root = cmp_node_create(left_db->ast->root);
     struct cmp_node *right_root = cmp_node_create(right_db->ast->root);
     if (!options.json) {
-        printf("; Left hash: ");
-        for (size_t i = 0; i < HASH_SIZE; i++) {
-            printf("%02hhx", (unsigned char)left_root->full_hash[i]);
-        }
-        putchar('\n');
-        printf("; Right hash: ");
-        for (size_t i = 0; i < HASH_SIZE; i++) {
-            printf("%02hhx", (unsigned char)right_root->full_hash[i]);
-        }
-        putchar('\n');
+        char hash_string[HASH_SIZE * 2 + 1];
+        cmp_hash_to_string(left_root->full_hash, hash_string);
+        printf("; Left hash: %s\n", hash_string);
+        cmp_hash_to_string(right_root->full_hash, hash_string);
+        printf("; Right hash: %s\n", hash_string);
     }
 
     struct diff_tree_node *diff_root = diff_tree_create(left_root, right_root);
