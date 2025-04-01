@@ -1,9 +1,32 @@
 from dataclasses import dataclass
-from enum import Enum
-from pathlib import Path
+from enum import StrEnum
 
-from whimse.explore.common import LocalPolicyModifications
-from whimse.selinux import PolicyModule
+
+class PolicyModuleLang(StrEnum):
+    CIL = "cil"
+    HLL = "hll"
+
+    @staticmethod
+    def from_lang_ext(lang_ext: str) -> "PolicyModuleLang":
+        match lang_ext:
+            case "cil":
+                return PolicyModuleLang.CIL
+            case _:
+                return PolicyModuleLang.HLL
+
+
+@dataclass(frozen=True)
+class PolicyModule:
+    name: str
+    priority: int
+    disabled: bool
+    files: frozenset[tuple[PolicyModuleLang, str]]
+
+    def get_file(self, lang: PolicyModuleLang) -> str | None:
+        for file_lang, file in self.files:
+            if file_lang == lang:
+                return file
+        return None
 
 
 @dataclass(frozen=True)
@@ -16,7 +39,7 @@ class Package:
         return self.full_name
 
 
-class PolicyModuleInstallMethod(Enum):
+class PolicyModuleInstallMethod(StrEnum):
     DIRECT = "direct"
     SEMODULE = "semodule"
     UNKNOWN = "unknown"
@@ -38,15 +61,3 @@ class PolicyModuleSource:
 class DistPolicyModule:
     module: PolicyModule
     source: PolicyModuleSource
-
-
-@dataclass(frozen=True)
-class DistPolicy:
-    modules: frozenset[DistPolicyModule]
-    local_modifications: LocalPolicyModifications
-    dontaudit_disabled: bool
-
-    root_path: Path
-
-    def get_file_path(self, file_path: str | Path) -> Path:
-        return self.root_path / Path(file_path).relative_to("/")

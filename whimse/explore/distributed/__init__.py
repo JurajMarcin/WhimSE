@@ -1,30 +1,33 @@
+import logging
 import shutil
 from collections.abc import Iterable
 from dataclasses import fields
+from pathlib import Path
 
 from whimse.config import Config, ModuleFetchMethod
-from whimse.explore.common import LocalPolicyModifications, PolicyExplorer
-from whimse.explore.distributed.pm import system_package_manager_factory
+from whimse.explore.common import ExploreStageError, PolicyExplorer
+from whimse.explore.distributed.pm import package_manager_factory
 from whimse.explore.distributed.pm.common import FetchPackageError
-from whimse.explore.distributed.types import (
-    DistPolicy,
+from whimse.types.local_modifications import LocalModifications
+from whimse.types.modules import (
     DistPolicyModule,
+    PolicyModule,
     PolicyModuleInstallMethod,
     PolicyModuleSource,
 )
-from whimse.explore.types import (
-    ExploreStageError,
-)
-from whimse.selinux import PolicyModule
-from whimse.utils.logging import get_logger
+from whimse.types.policy import DistPolicy
 
-_logger = get_logger(__name__)
+_logger = logging.getLogger(__name__)
 
 
-class DistPolicyExplorer(PolicyExplorer):
+class DistPolicyExplorer(PolicyExplorer[DistPolicy]):
     def __init__(self, config: Config) -> None:
         super().__init__(config)
-        self._package_manager = system_package_manager_factory(config)
+        self._package_manager = package_manager_factory(config)
+
+    @property
+    def policy_store(self) -> Path:
+        return self._config.shadow_policy_store_path
 
     def _fetch_dist_modules(
         self, dist_modules: Iterable[DistPolicyModule]
@@ -47,7 +50,7 @@ class DistPolicyExplorer(PolicyExplorer):
                     ):
                         continue
                     for module in source_modules.copy():
-                        _logger.verbose(
+                        _logger.debug(
                             "Fetching files of module %r from local files",
                             module,
                         )
@@ -71,7 +74,7 @@ class DistPolicyExplorer(PolicyExplorer):
                 for source, source_modules in modules_by_source.items():
                     if not source_modules:
                         continue
-                    _logger.verbose(
+                    _logger.debug(
                         "Fetching files of modules %r from %s package",
                         source_modules,
                         (
@@ -117,15 +120,15 @@ class DistPolicyExplorer(PolicyExplorer):
     def _get_dist_modules(self) -> Iterable[DistPolicyModule]:
         return self._fetch_dist_modules(self._package_manager.find_selinux_modules())
 
-    def get_dist_policy(self) -> DistPolicy:
-        _logger.info("Gathering facts about distribution policy")
-        _logger.verbose(
-            "Fetching local modification files and disable_dontaudit status"
+    def get_policy(self) -> DistPolicy:
+        _logger.info("Gathering facts about the distribution policy")
+        _logger.debug(
+            "Fetching the local modification files and the disable_dontaudit status"
         )
         self._package_manager.fetch_files(
             [
                 str(self._config.policy_store_path / field.metadata["file"])
-                for field in fields(LocalPolicyModifications)
+                for field in fields(LocalModifications)
             ]
             + [str(self._config.policy_store_path / "disable_dontaudit")],
             require_exact_version=False,
@@ -134,8 +137,8 @@ class DistPolicyExplorer(PolicyExplorer):
         modules = self._get_dist_modules()
 
         return DistPolicy(
-            modules,
-            LocalPolicyModifications.read(self._config.shadow_policy_store_path),
-            (self._config.shadow_policy_store_path / "disable_dontaudit").is_file(),
+            self.get_local_modifications(),
+            self.get_disable_dontaudit_state(),
+            frozenset(modules),
             self._config.shadow_root_path,
         )

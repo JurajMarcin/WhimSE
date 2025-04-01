@@ -2,6 +2,7 @@ import re
 import shlex
 from collections.abc import Iterable
 from dataclasses import dataclass, field
+from logging import getLogger
 from pathlib import Path
 
 from rpm import (  # pylint: disable=no-name-in-module
@@ -20,18 +21,18 @@ from rpm import (  # pylint: disable=no-name-in-module
 
 from whimse.config import Config
 from whimse.explore.distributed.pm.common import FetchPackageError, PackageManager
-from whimse.explore.distributed.types import (
+from whimse.types.modules import (
     DistPolicyModule,
     Package,
+    PolicyModule,
     PolicyModuleInstallMethod,
+    PolicyModuleLang,
     PolicyModuleSource,
 )
-from whimse.selinux import PolicyModule, PolicyModuleLang
-from whimse.utils.logging import get_logger
 from whimse.utils.semodule import list_semodule_installs
 from whimse.utils.subprocess import run
 
-_logger = get_logger(__name__)
+_logger = getLogger(__name__)
 
 PROVIDED_MODULE_PATTERN = re.compile(
     r"(?P<module_name>[^\/]+)\.(?P<lang_ext>pp|cil)(?:\.(?P<file_compression>\w+))?$"
@@ -83,7 +84,7 @@ class DNFPackageManager(PackageManager):
                     # Module directory is only in package metadata, possibly
                     # the module is installed later from one of the provided
                     # module files
-                    _logger.verbose(
+                    _logger.debug(
                         "Found ghost module %r with priority %r in package %r",
                         name,
                         priority,
@@ -115,7 +116,7 @@ class DNFPackageManager(PackageManager):
                             disabled_file in package_files,
                             frozenset(module_files),
                         )
-                        _logger.verbose(
+                        _logger.debug(
                             "Found direct module %r in package %r", module, package
                         )
                         package_modules.direct.add(module)
@@ -129,7 +130,7 @@ class DNFPackageManager(PackageManager):
                 # File is not in policy store, but it looks like a policy
                 # module file that could be installed later
                 module_name, lang_ext = match.group("module_name", "lang_ext")
-                _logger.verbose(
+                _logger.debug(
                     "Found possible provided module file %r in package %r",
                     file,
                     package,
@@ -148,7 +149,7 @@ class DNFPackageManager(PackageManager):
             "Searching for installed policy modules in package %r", package.full_name
         )
         for install_file, install_priority in list_semodule_installs(post_install):
-            _logger.verbose(
+            _logger.debug(
                 "Found install of %r as policy module with priority %r in package %r",
                 install_file,
                 install_priority,

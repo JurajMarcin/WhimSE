@@ -1,15 +1,11 @@
 import shlex
 from collections import deque
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
-
-from whimse.utils.logging import get_logger
-
-_logger = get_logger(__name__)
 
 
 @dataclass(frozen=True)
-class Statement:
+class LocalModificationStatement:
     pass
 
 
@@ -18,18 +14,33 @@ class SecurityLevel:
     sensitivity: str
     categories: str | None
 
+    def __str__(self) -> str:
+        return (
+            f"{self.sensitivity}:{self.categories}"
+            if self.categories
+            else f"{self.sensitivity}"
+        )
+
     @staticmethod
     def parse(string: str) -> "SecurityLevel":
         data = string.split(":", 2)
         return SecurityLevel(data[0], data[1] if len(data) > 1 else None)
 
+
+@dataclass(frozen=True)
+class SecurityRange:
+    low: SecurityLevel
+    high: SecurityLevel | None
+
+    def __str__(self) -> str:
+        return f"{self.low}-{self.high}" if self.high else f"{self.low}"
+
     @staticmethod
-    def parse_range(string: str) -> "tuple[SecurityLevel, SecurityLevel]":
+    def parse(string: str) -> "SecurityRange":
         data = list(subs.strip() for subs in string.split("-", 2))
-        low = (high := SecurityLevel.parse(data[0]))
-        if len(data) > 1:
-            high = SecurityLevel.parse(data[1])
-        return (low, high)
+        low = SecurityLevel.parse(data[0])
+        high = SecurityLevel.parse(data[1]) if len(data) > 1 else None
+        return SecurityRange(low, high)
 
 
 @dataclass(frozen=True)
@@ -37,7 +48,14 @@ class SecurityContext:
     user: str
     role: str
     type: str
-    mls_range: tuple[SecurityLevel, SecurityLevel] | None
+    mls_range: SecurityRange | None
+
+    def __str__(self) -> str:
+        return (
+            f"{self.user}:{self.role}:{self.type}:{self.mls_range}"
+            if self.mls_range
+            else f"{self.user}:{self.role}:{self.type}"
+        )
 
     @staticmethod
     def parse(string: str) -> "SecurityContext":
@@ -48,14 +66,17 @@ class SecurityContext:
             data[0],
             data[1],
             data[2],
-            SecurityLevel.parse_range(data[3]) if len(data) > 3 else None,
+            SecurityRange.parse(data[3]) if len(data) > 3 else None,
         )
 
 
 @dataclass(frozen=True)
-class Boolean(Statement):
+class Boolean(LocalModificationStatement):
     name: str
     value: bool
+
+    def __str__(self) -> str:
+        return f"{self.name}={str(self.value).lower()}"
 
     @staticmethod
     def parse(string: str) -> "Boolean":
@@ -71,14 +92,14 @@ class Boolean(Statement):
 
 
 class FileContextFileType(StrEnum):
-    BLOCK_DEVICE = "block_DEVICE"
-    CHARACTER_DEVICE = "character_device"
-    DIRECTORY = "directory"
-    NAMED_PIPE = "named_pipe"
-    SYMBOLIC_LINK = "symbolic_link"
-    SOCKET_FILE = "socket_file"
-    REGULAR_FILE = "regular_file"
-    ALL = "all"
+    BLOCK_DEVICE = "-b"
+    CHARACTER_DEVICE = "-c"
+    DIRECTORY = "-d"
+    NAMED_PIPE = "-p"
+    SYMBOLIC_LINK = "-l"
+    SOCKET_FILE = "-s"
+    REGULAR_FILE = "--"
+    ALL = ""
 
     @staticmethod
     def parse(string: str) -> "FileContextFileType":
@@ -97,16 +118,19 @@ class FileContextFileType(StrEnum):
                 return FileContextFileType.SOCKET_FILE
             case "--":
                 return FileContextFileType.REGULAR_FILE
-            case "" | None:
+            case "":
                 return FileContextFileType.ALL
         raise ValueError(f"Invalid file context file type '{string}'")
 
 
 @dataclass(frozen=True)
-class FileContext(Statement):
+class FileContext(LocalModificationStatement):
     pathname_regexp: str
     file_type: FileContextFileType
-    context: SecurityContext
+    context: SecurityContext | None
+
+    def __str__(self) -> str:
+        return f"{self.pathname_regexp} {self.file_type} {self.context if self.context else '<<none>>'}"
 
     @staticmethod
     def parse(string: str) -> "FileContext":
@@ -120,16 +144,21 @@ class FileContext(Statement):
                 if len(data) == 3
                 else FileContextFileType.ALL
             ),
-            SecurityContext.parse(data[-1]),
+            SecurityContext.parse(data[-1]) if data[-1] != "<<none>>" else None,
         )
 
 
 @dataclass(frozen=True)
-class User(Statement):
-    name: str
+class User(LocalModificationStatement):
     is_group: bool
+    name: str
     selinux_user: str
-    mls_range: tuple[SecurityLevel, SecurityLevel] | None
+    mls_range: SecurityRange | None
+
+    def __str__(self) -> str:
+        return f"{'%' if self.is_group else '' }{self.name}:{self.selinux_user}" + (
+            f":{self.mls_range}" if self.mls_range else ""
+        )
 
     @staticmethod
     def parse(string: str) -> "User":
@@ -142,17 +171,20 @@ class User(Statement):
         if len(data) < 2:
             raise ValueError(f"Invalid user statement '{string}'")
         return User(
-            data[0],
             is_group,
+            data[0],
             data[1],
-            SecurityLevel.parse_range(data[2]) if len(data) == 3 else None,
+            SecurityRange.parse(data[2]) if len(data) == 3 else None,
         )
 
 
 @dataclass(frozen=True)
-class UserLabelingPrefix(Statement):
+class UserLabelingPrefix(LocalModificationStatement):
     selinux_user: str
     prefix: str
+
+    def __str__(self) -> str:
+        return f"user {self.selinux_user} prefix {self.prefix};"
 
     @staticmethod
     def parse(string: str) -> "UserLabelingPrefix":
@@ -168,11 +200,18 @@ class UserLabelingPrefix(Statement):
 
 
 @dataclass(frozen=True)
-class SelinuxUser(Statement):
-    name: str
+class SelinuxUser(LocalModificationStatement):
+    user: str
     roles: frozenset[str]
     mls_level: SecurityLevel | None
-    mls_range: tuple[SecurityLevel, SecurityLevel] | None
+    mls_range: SecurityRange | None
+
+    def __str__(self) -> str:
+        return (
+            f"user {self.user} roles {{ {' '.join(self.roles)} }}"
+            + (f" level {self.mls_level}" if self.mls_level else "")
+            + (f" range {self.mls_range}" if self.mls_range else "")
+        )
 
     @staticmethod
     def parse(string: str) -> "SelinuxUser":
@@ -205,7 +244,7 @@ class SelinuxUser(Statement):
 
             if dataq[0] == "range":
                 dataq.popleft()
-                mls_range = SecurityLevel.parse_range(dataq.popleft())
+                mls_range = SecurityRange.parse(dataq.popleft())
             else:
                 mls_range = None
 
@@ -214,28 +253,30 @@ class SelinuxUser(Statement):
             raise ValueError(f"Invalid selinux user statement '{string}") from None
 
 
-class PolicyModuleLang(StrEnum):
-    CIL = "cil"
-    HLL = "hll"
-
-    @staticmethod
-    def from_lang_ext(lang_ext: str) -> "PolicyModuleLang":
-        match lang_ext:
-            case "cil":
-                return PolicyModuleLang.CIL
-            case _:
-                return PolicyModuleLang.HLL
-
-
 @dataclass(frozen=True)
-class PolicyModule:
-    name: str
-    priority: int
-    disabled: bool
-    files: frozenset[tuple[PolicyModuleLang, str]]
-
-    def get_file(self, lang: PolicyModuleLang) -> str | None:
-        for file_lang, file in self.files:
-            if file_lang == lang:
-                return file
-        return None
+class LocalModifications:
+    booleans: frozenset[Boolean] = field(
+        metadata={"file": "active/booleans.local", "parser": Boolean.parse}
+    )
+    file_contexts: tuple[FileContext, ...] = field(
+        metadata={
+            "file": "active/file_contexts.local",
+            "parser": FileContext.parse,
+            "container": tuple,
+        }
+    )
+    interfaces: frozenset[str] = field(metadata={"file": "active/interfaces.local"})
+    nodes: frozenset[str] = field(metadata={"file": "active/nodes.local"})
+    ports: frozenset[str] = field(metadata={"file": "active/ports.local"})
+    selinux_users: frozenset[SelinuxUser] = field(
+        metadata={"file": "active/users.local", "parser": SelinuxUser.parse}
+    )
+    users: frozenset[User] = field(
+        metadata={"file": "active/seusers.local", "parser": User.parse}
+    )
+    user_prefixes: frozenset[UserLabelingPrefix] = field(
+        metadata={
+            "file": "active/users_extra.local",
+            "parser": UserLabelingPrefix.parse,
+        }
+    )

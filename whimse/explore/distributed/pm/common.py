@@ -1,11 +1,8 @@
 from collections.abc import Iterable
 
 from whimse.config import Config
-from whimse.explore.distributed.types import DistPolicyModule, Package
-from whimse.explore.types import ExploreStageError
-from whimse.utils.logging import get_logger
-
-_logger = get_logger(__name__)
+from whimse.explore.common import ExploreStageError
+from whimse.types.modules import DistPolicyModule, Package
 
 
 class PackageManager:

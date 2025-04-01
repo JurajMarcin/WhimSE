@@ -1,66 +1,61 @@
 from collections.abc import Callable, Iterable
-from dataclasses import Field, dataclass, field, fields
+from dataclasses import fields
+from logging import getLogger
 from pathlib import Path
 
 from whimse.config import Config
-from whimse.selinux import Boolean, FileContext, SelinuxUser, User, UserLabelingPrefix
-from whimse.utils.logging import get_logger
+from whimse.types.local_modifications import LocalModifications
+from whimse.types.policy import Policy
 
-_logger = get_logger(__name__)
+_logger = getLogger(__name__)
 
 
-@dataclass(frozen=True)
-class LocalPolicyModifications:
-    booleans: frozenset[Boolean] = field(
-        metadata={"file": "active/booleans.local", "const": Boolean.parse}
-    )
-    file_contexts: tuple[FileContext, ...] = field(
-        metadata={
-            "file": "active/file_contexts.local",
-            "const": FileContext.parse,
-            "cont": tuple,
-        }
-    )
-    interfaces: frozenset[str] = field(metadata={"file": "active/interfaces.local"})
-    nodes: frozenset[str] = field(metadata={"file": "active/nodes.local"})
-    ports: frozenset[str] = field(metadata={"file": "active/ports.local"})
-    selinux_users: frozenset[SelinuxUser] = field(
-        metadata={"file": "active/users.local", "const": SelinuxUser.parse}
-    )
-    users: frozenset[User] = field(
-        metadata={"file": "active/seusers.local", "const": User.parse}
-    )
-    user_prefixes: frozenset[UserLabelingPrefix] = field(
-        metadata={"file": "active/users_extra.local", "const": UserLabelingPrefix.parse}
-    )
+class ExploreStageError(Exception):
+    pass
 
-    @staticmethod
-    def _read_data_field[CT, T](policy_store: Path, data_field: Field[CT]) -> CT:
-        const: Callable[[str], T] = data_field.metadata.get("const", str)
-        cont: Callable[[Iterable[T]], CT] = data_field.metadata.get("cont", frozenset)
+
+class PolicyExplorer[PolicyT: Policy]:
+    def __init__(self, config: Config) -> None:
+        self._config = config
+
+    @property
+    def policy_store(self) -> Path:
+        raise NotImplementedError()
+
+    def _read_local_mod_file[
+        ContainerT, T
+    ](
+        self,
+        path: Path,
+        container: Callable[[Iterable[T]], ContainerT],
+        parser: Callable[[str], T],
+    ) -> ContainerT:
         try:
-            with open(
-                policy_store / data_field.metadata["file"], "r", encoding="locale"
-            ) as file:
-                return cont(
-                    const(line.strip())
-                    for line in file
-                    if line.strip() and not line.strip().startswith("#")
+            with open(path, "r", encoding="locale") as file:
+                return container(
+                    parser(line)
+                    for line in (line.strip() for line in file)
+                    if line and not line.startswith("#")
                 )
         except FileNotFoundError:
-            return cont(())
+            return container(())
 
-    @staticmethod
-    def read(policy_store: Path) -> "LocalPolicyModifications":
-        _logger.verbose("Reading local policy modifications")
-        return LocalPolicyModifications(
+    def get_local_modifications(self) -> LocalModifications:
+        _logger.debug("Reading local policy modifications from %r", self.policy_store)
+        return LocalModifications(
             *(
-                LocalPolicyModifications._read_data_field(policy_store, data_field)
-                for data_field in fields(LocalPolicyModifications)
+                self._read_local_mod_file(
+                    self.policy_store / data_field.metadata["file"],
+                    data_field.metadata.get("container", frozenset),
+                    data_field.metadata.get("parser", str),
+                )
+                for data_field in fields(LocalModifications)
             )
         )
 
+    def get_disable_dontaudit_state(self) -> bool:
+        _logger.debug("Checking disable dontaudit state in %r", self.policy_store)
+        return (self.policy_store / "disable_dontaudit").is_file()
 
-class PolicyExplorer:
-    def __init__(self, config: Config) -> None:
-        self._config = config
+    def get_policy(self) -> PolicyT:
+        raise NotImplementedError()
