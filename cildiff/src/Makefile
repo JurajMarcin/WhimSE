@@ -1,17 +1,20 @@
 PREFIX ?= /usr
+BINDIR ?= $(PREFIX)/bin
 
-TARGET = cildiff
+CILDIFF = cildiff
 SRCS = $(sort $(wildcard *.c))
 HDRS = $(sort $(wildcard *.h))
 OBJS = $(patsubst %.c,%.o,$(SRCS))
-CFLAGS ?= -std=c23 -Wall -Wextra -pedantic
 ifdef DEBUG
-CFLAGS += -g
+override CFLAGS += -g
+else
+override CFLAGS += -Werror
 endif
 
-override CFLAGS += -D_GNU_SOURCE
+override CFLAGS += -std=c23 -pedantic -Wall -Wextra -D_GNU_SOURCE
 
 override CFLAGS += \
+	-I "../selinux/libsepol/include/" \
 	-I "../selinux/libsepol/cil/src/" \
 	-I "../selinux/libsepol/cil/include/"
 
@@ -24,18 +27,37 @@ override LDLIBS += \
 	$(shell pkg-config --libs openssl) \
 	../selinux/libsepol/src/libsepol.a
 
-all: $(TARGET)
+
+all: $(CILDIFF)
 .PHONY: all
 
-$(TARGET): $(OBJS)
+
+$(CILDIFF): $(OBJS) ../selinux/libsepol/src/libsepol.a
+
+
+$(OBJS): $(HDRS)
+
+
+../selinux/libsepol/src/libsepol.a:
+	@echo "Use Makefile in parent directory to compile static libsepol"
+	@exit 1
+
+
+install:
+	-mkdir -p $(DESTDIR)$(BINDIR)
+	install -m 755 $(CILDIFF) $(DESTDIR)$(BINDIR)
+.PHONY: install
+
 
 clean:
 	$(RM) $(OBJS)
 .PHONY: clean
 
+
 distclean:
-	$(RM) $(TARGET)
+	$(RM) $(CILDIFF)
 .PHONY: distclean
+
 
 compile_commands.json: $(SRCS) $(HDRS)
 	$(MAKE) clean

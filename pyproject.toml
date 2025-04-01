@@ -1,8 +1,11 @@
+[build-system]
+requires = ["setuptools >= 60"]
+build-backend = "setuptools.build_meta"
+
 [project]
 dynamic = ["version"]
 name = "whimse"
 dependencies = [
-    "auparse",
     "jinja2 > 3",
     "pydantic > 2",
     "rpm > 4",
@@ -14,9 +17,15 @@ requires-python = ">= 3.11"
 [project.scripts]
 whimse = "whimse:main"
 
+[tool.setuptools.dynamic]
+version = { attr = "whimse.__version__" }
+
+[tool.setuptools.packages.find]
+include = ["whimse"]
+
 [tool.pylint.main]
 ignore = [
-    "cildiff"
+    "cildiff",
 ]
 
 [tool.pylint."messages control"]
