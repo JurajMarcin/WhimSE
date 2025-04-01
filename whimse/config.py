@@ -2,6 +2,7 @@ from argparse import Action, ArgumentParser, FileType, Namespace, RawTextHelpFor
 from collections.abc import Sequence
 from configparser import ConfigParser
 from dataclasses import dataclass
+from datetime import datetime
 from enum import StrEnum
 from logging import DEBUG, INFO
 from pathlib import Path
@@ -48,11 +49,14 @@ class Config:
     policy_store_path: Path
     module_fetch_methods: tuple[ModuleFetchMethod, ...]
 
+    avc_start_time: datetime | None
+
     input: TextIO | None
     report_format: ReportFormat
     output: TextIO
     full_report: bool
     show_lookalikes: bool
+
     @property
     def shadow_root_path(self) -> Path:
         return self.work_dir / "root"
@@ -168,6 +172,15 @@ class Config:
             "Equivalent to '--module-fetch newer'.",
         )
 
+        analysis_options = parser.add_argument_group("Analysis options")
+        analysis_options.add_argument(
+            "--avc-start-time",
+            action="store",
+            type=datetime.fromisoformat,
+            default=None,
+            help="Start time for AVC analysis audit event search. Must be in ISO format.",
+        )
+
         report_options = parser.add_argument_group("Report options")
         report_options.add_argument(
             "--input",
@@ -224,6 +237,7 @@ class Config:
                     ModuleFetchMethod.NEWER_PACKAGE,
                 )
             ),
+            avc_start_time=parsed_args.avc_start_time,
             input=parsed_args.input,
             report_format=parsed_args.format,
             output=parsed_args.output,
