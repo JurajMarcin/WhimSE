@@ -1,6 +1,8 @@
 #ifndef CMP_NODE_DEFS_H
 #define CMP_NODE_DEFS_H
 
+#include <stdbool.h>
+
 #include "cmp_node.h"
 #include "diff.h"
 

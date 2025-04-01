@@ -2,6 +2,7 @@
 #define CILDIFF_JSON_H
 
 #include <stdio.h>
+#include <stdbool.h>
 
 #include "diff.h"
 

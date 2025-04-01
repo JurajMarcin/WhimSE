@@ -1,6 +1,8 @@
 #ifndef CMP_SUBSET_DEFS_H
 #define CMP_SUBSET_DEFS_H
 
+#include <stdbool.h>
+
 #include "cmp_subset.h"
 
 

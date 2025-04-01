@@ -41,7 +41,7 @@ void cmp_node_compare(const struct cmp_node *left, const struct cmp_node *right,
 struct cmp_sim cmp_node_sim(const struct cmp_node *left, const struct cmp_node *right)
 {
     if (!left && !right) {
-        return (struct cmp_sim) { };
+        return (struct cmp_sim) { 0 };
     }
     assert(!left || !right || left->cil_node->flavor == right->cil_node->flavor);
     const struct cmp_node_def *def = cmp_node_get_def(EITHER(left, right, cil_node));

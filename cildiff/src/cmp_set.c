@@ -148,7 +148,7 @@ static int set_sim_map(hashtab_key_t key, hashtab_datum_t datum, void *opaque)
 
 struct cmp_sim cmp_set_sim(const struct cmp_set *left, struct cmp_set *right)
 {
-    struct cmp_sim sim = { };
+    struct cmp_sim sim = { 0 };
 
     struct set_sim_args args = {
         .this_side = DIFF_LEFT,

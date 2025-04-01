@@ -11,7 +11,7 @@ else
 override CFLAGS += -Werror
 endif
 
-override CFLAGS += -std=c23 -pedantic -Wall -Wextra -D_GNU_SOURCE
+override CFLAGS += -std=c11 -pedantic -Wall -Wextra -D_GNU_SOURCE
 
 override CFLAGS += \
 	-I "../selinux/libsepol/include/" \

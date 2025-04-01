@@ -188,7 +188,7 @@ static int subset_sim_map(hashtab_key_t key, hashtab_datum_t datum, void *opaque
 struct cmp_sim cmp_subset_sim(const struct cmp_subset *left, const struct cmp_subset *right)
 {
     if (!left && !right) {
-        return (struct cmp_sim) {};
+        return (struct cmp_sim) { 0 };
     }
     assert(!left || !right || left->flavor == right->flavor);
     const struct cmp_subset_def *def = cmp_subset_get_def(EITHER(left, right, flavor));
@@ -199,7 +199,7 @@ struct cmp_sim cmp_subset_sim(const struct cmp_subset *left, const struct cmp_su
         return def->sim(left, right);
     }
 
-    struct cmp_sim sim = {};
+    struct cmp_sim sim = { 0 };
 
     struct subset_sim_args args = {
         .this_side = DIFF_LEFT,
