@@ -1,35 +1,25 @@
-import logging
-from pathlib import Path
+from logging import basicConfig, getLogger
+from shutil import rmtree
 from sys import stderr
-from tempfile import mkdtemp
 
-from whimse.config import Config, ModuleFetchMethod
+from whimse.config import Config
 from whimse.detect import PolicyChangesDetector
 from whimse.explore import explore_stage
-from whimse.report.types import Report
-from whimse.utils.logging import get_logger
+from whimse.report import report_formatter_factory
+from whimse.report.analysis import AnalysisRunner
+from whimse.report.json import JSONReportFormattter
 
-logging.basicConfig(level=logging.DEBUG, stream=stderr)
-
-
-_logger = get_logger(__name__)
+__version__ = "1.0"
 
 
 def main() -> None:
-    _logger.debug("started")
+    config = Config.parse_args(__version__)
+    basicConfig(level=config.log_level, stream=stderr)
+    _logger = getLogger(__name__)
+    for vf, level in config.log_levels.items():
+        getLogger(vf).setLevel(level)
+    _logger.debug("%r", config)
 
-    tmpdir = mkdtemp()
-    print(tmpdir)
-    config = Config(
-        Path("./cildiff/src/cildiff"),
-        Path("/var/lib/selinux/targeted"),
-        Path(tmpdir),
-        [
-            ModuleFetchMethod.LOCAL_MODULE,
-            ModuleFetchMethod.EXACT_PACKAGE,
-            ModuleFetchMethod.NEWER_PACKAGE,
-        ],
-    )
     explore_stage_result = explore_stage(config)
 
     with open("dist_policy.txt", "w") as f:
