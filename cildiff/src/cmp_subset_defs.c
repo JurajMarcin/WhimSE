@@ -201,6 +201,14 @@ static const struct cmp_subset_def subset_defs[] = {
         REGISTER_SUBSET(container_single_jump_node),
         REGISTER_SUBSET_COMPARE(container_single_jump_node),
     },
+    [CIL_BOOLEANIF] = {
+        REGISTER_SUBSET(container_sim),
+        REGISTER_SUBSET_COMPARE(container_sim),
+    },
+    [CIL_TUNABLEIF] = {
+        REGISTER_SUBSET(container_sim),
+        REGISTER_SUBSET_COMPARE(container_sim),
+    },
     [CIL_BLOCK] = {
         REGISTER_SUBSET(container_single),
         REGISTER_SUBSET_COMPARE(container_single),
