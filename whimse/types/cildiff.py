@@ -1,17 +1,10 @@
-from itertools import chain
-from pathlib import Path
 import shlex
 from collections.abc import Iterable
 from enum import StrEnum
+from itertools import chain
 from typing import Annotated, Any, Literal
+
 from pydantic import BaseModel, Discriminator, Field
-
-from whimse.config import Config
-from whimse.utils.logging import get_logger
-from whimse.utils.subprocess import run
-
-
-_logger = get_logger(__name__)
 
 
 def _list_join(items: Iterable[Any]) -> str:
@@ -42,6 +35,10 @@ def _str_or_cil(value: str | CilBase, indent: int) -> Iterable[tuple[str, int]]:
 
 class CilNodeBase(CilBase):
     line: int
+
+
+class CilContainerBase:
+    children: list["CilNode"]
 
 
 class CilExprOperator(StrEnum):
@@ -154,11 +151,10 @@ class CilMacroParam(BaseModel):
     name: str
 
 
-class CilMacro(BaseModel, CilNodeBase):
+class CilMacro(BaseModel, CilNodeBase, CilContainerBase):
     flavor: Literal["macro"]
     id: str
     params: list[CilMacroParam]
-    children: list["CilNode"]
 
     def cil(self, indent: int = 0) -> Iterable[tuple[str, int]]:
         params_str = (
@@ -283,9 +279,8 @@ class CilBoolean(BaseModel, CilNodeBase):
         yield f"({self.flavor} {self.id} {_CIL_BOOL_STR[self.value]})", indent
 
 
-class CilCondblock(BaseModel, CilBase):
+class CilCondblock(BaseModel, CilBase, CilContainerBase):
     value: bool
-    children: list["CilNode"]
 
     def cil(self, indent: int = 0) -> Iterable[tuple[str, int]]:
         yield f"({_CIL_BOOL_STR[self.value]}", indent
@@ -297,6 +292,10 @@ class CilBooleanif(BaseModel, CilNodeBase):
     flavor: Literal["booleanif"]
     condition: CilExpr
     branches: list[CilCondblock]
+
+    @property
+    def children(self) -> Iterable["CilNode"]:
+        yield from chain(*(branch.children for branch in self.branches))
 
     def cil(self, indent: int = 0) -> Iterable[tuple[str, int]]:
         yield f"({self.flavor}", indent
@@ -318,6 +317,10 @@ class CilTunableif(BaseModel, CilNodeBase):
     flavor: Literal["tunableif"]
     condition: CilExpr
     branches: list[CilCondblock]
+
+    @property
+    def children(self) -> Iterable["CilNode"]:
+        yield from chain(*(branch.children for branch in self.branches))
 
     def cil(self, indent: int = 0) -> Iterable[tuple[str, int]]:
         yield f"({self.flavor}", indent
@@ -359,10 +362,9 @@ class CilValidatetrans(BaseModel, CilNodeBase):
 #
 
 
-class CilBlock(BaseModel, CilNodeBase):
+class CilBlock(BaseModel, CilNodeBase, CilContainerBase):
     flavor: Literal["block"]
     id: str
-    children: list["CilNode"]
 
     def cil(self, indent: int = 0) -> Iterable[tuple[str, int]]:
         yield f"({self.flavor} {self.id}", indent
@@ -386,10 +388,9 @@ class CilBlockinherit(BaseModel, CilNodeBase):
         yield f"({self.flavor} {self.template})", indent
 
 
-class CilOptional(BaseModel, CilNodeBase):
+class CilOptional(BaseModel, CilNodeBase, CilContainerBase):
     flavor: Literal["optional"]
     id: str
-    children: list["CilNode"]
 
     def cil(self, indent: int = 0) -> Iterable[tuple[str, int]]:
         yield f"({self.flavor} {self.id}", indent
@@ -402,11 +403,10 @@ class CilInPosition(StrEnum):
     BEFORE = "before"
 
 
-class CilIn(BaseModel, CilNodeBase):
+class CilIn(BaseModel, CilNodeBase, CilContainerBase):
     flavor: Literal["in"]
     position: CilInPosition
     container: str
-    children: list["CilNode"]
 
     def cil(self, indent: int = 0) -> Iterable[tuple[str, int]]:
         yield f"({self.flavor} {self.position} {self.container}", indent
@@ -1238,7 +1238,6 @@ class CilDiffNode(BaseModel):
     diffs: list[CilDiff]
     children: list["CilDiffNode"]
 
-
-def cildiff(config: Config, left_file: Path, right_file: Path) -> CilDiffNode:
-    diffp = run([config.cildiff_path, "--json", str(left_file), str(right_file)], text=True, logger=_logger, check=True)
-    return CilDiffNode.model_validate_json(diffp.stdout)
+    @property
+    def contains_changes(self) -> bool:
+        return len(self.diffs) > 0 or len(self.children) > 0
