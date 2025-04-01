@@ -79,6 +79,10 @@ static void json_print_next(FILE *output)
 
 static void json_print_string(FILE *output, const char *string)
 {
+    if (!string) {
+        fputs("null", output);
+        return;
+    }
     fputc('"', output);
     for (size_t i = 0; string[i]; i++) {
         switch (string[i]) {
@@ -92,37 +96,21 @@ static void json_print_string(FILE *output, const char *string)
     fputc('"', output);
 }
 
-__attribute__ ((format(printf, 4, 5)))
-static void json_print_kv(int indent, FILE *output, const char *key, const char *value_fmt, ...)
+static void json_print_bool(FILE *output, bool value)
+{
+    fputs(value ? "true" : "false", output);
+}
+
+static void json_print_uint(FILE *output, uint64_t value)
+{
+    fprintf(output, "%" PRIu64, value);
+}
+
+static void json_print_key(int indent, FILE *output, const char *key)
 {
     json_print_indent(indent, output);
     json_print_string(output, key);
     fputs(": ", output);
-    if (!value_fmt) {
-        return;
-    }
-    va_list args;
-    va_start(args);
-    va_list tmp_args;
-    va_copy(tmp_args, args);
-    if (!strcmp(value_fmt, "%b")) {
-        bool value = va_arg(tmp_args, int);
-        fputs(value ? "true" : "false", output);
-        goto exit;
-    }
-    if (!strcmp(value_fmt, "%s")) {
-        const char *str = va_arg(tmp_args, const char *);
-        if (!str) {
-            fputs("null", output);
-            goto exit;
-        }
-        json_print_string(output, str);
-        goto exit;
-    }
-    vfprintf(output, value_fmt, args);
-exit:
-    va_end(tmp_args);
-    va_end(args);
 }
 
 
@@ -190,7 +178,7 @@ static void json_print_str_or_cil_data(int indent, FILE *output, const char *str
 
 static void json_print_cil_node_children(int indent, FILE *output, const char *key, struct cil_tree_node *cil_node)
 {
-    json_print_kv(indent, output, key ? key : "children", NULL);
+    json_print_key(indent, output, key ? key : "children");
     indent = json_array_start(indent, output);
     for (struct cil_tree_node *child = cil_node->cl_head; child; child = child->next) {
         json_print_indent(indent, output);
@@ -239,9 +227,10 @@ static void json_print_expr(int indent, FILE *output, const struct cil_list *exp
         operator_str = *(expr_op_keys[(uintptr_t)head->data]);
         head = head->next;
     }
-    json_print_kv(indent, output, "operator", "%s", operator_str);
+    json_print_key(indent, output, "operator");
+    json_print_string(output, operator_str);
     json_print_next(output);
-    json_print_kv(indent, output, "operands", NULL);
+    json_print_key(indent, output, "operands");
     indent = json_array_start(indent, output);
     for (const struct cil_list_item *item = head; item; item = item->next) {
         json_print_indent(indent, output);
@@ -280,9 +269,10 @@ DEFINE_JSON_NODE(ordered, struct cil_ordered)
         unordered = true;
         head = head->next;
     }
-    json_print_kv(indent, output, "unordered", "%b", unordered);
+    json_print_key(indent, output, "unordered");
+    json_print_bool(output, unordered);
     json_print_next(output);
-    json_print_kv(indent, output, "order", NULL);
+    json_print_key(indent, output, "order");
     indent = json_array_start(indent, output);
     for (const struct cil_list_item *item = head; item; item = item->next) {
         json_print_indent(indent, output);
@@ -300,24 +290,29 @@ DEFINE_JSON_NODE(decl_name, struct cil_symtab_datum) \
     (void)cil_node; \
     static_assert(offsetof(type, datum) == 0, \
                   # decl_name " is not a simple CIL declaration"); \
-    json_print_kv(indent, output, "id", "%s", decl_name->name); \
+    json_print_key(indent, output, "id"); \
+    json_print_string(output, decl_name->name); \
 }
 
 #define DEFINE_JSON_NODE_ALIAS_ACTUAL(decl_name, orig_name) \
 DEFINE_JSON_NODE(decl_name, struct cil_aliasactual) \
 { \
     (void)cil_node; \
-    json_print_kv(indent, output, orig_name "alias", "%s", decl_name->alias_str); \
+    json_print_key(indent, output, orig_name "alias"); \
+    json_print_string(output, decl_name->alias_str); \
     json_print_next(output); \
-    json_print_kv(indent, output, orig_name, "%s", decl_name->actual_str); \
+    json_print_key(indent, output, orig_name); \
+    json_print_string(output, decl_name->actual_str); \
 }
 
 DEFINE_JSON_NODE(bounds, struct cil_bounds)
 {
     (void)cil_node;
-    json_print_kv(indent, output, "parent", "%s", bounds->parent_str);
+    json_print_key(indent, output, "parent");
+    json_print_string(output, bounds->parent_str);
     json_print_next(output);
-    json_print_kv(indent, output, "child", "%s", bounds->child_str);
+    json_print_key(indent, output, "child");
+    json_print_string(output, bounds->child_str);
 }
 
 /******************************************************************************
@@ -326,11 +321,13 @@ DEFINE_JSON_NODE(bounds, struct cil_bounds)
 
 DEFINE_JSON_NODE(avrule, struct cil_avrule)
 {
-    json_print_kv(indent, output, "source", "%s", avrule->src_str);
+    json_print_key(indent, output, "source");
+    json_print_string(output, avrule->src_str);
     json_print_next(output);
-    json_print_kv(indent, output, "target", "%s", avrule->tgt_str);
+    json_print_key(indent, output, "target");
+    json_print_string(output, avrule->tgt_str);
     json_print_next(output);
-    json_print_kv(indent, output, "classperms", NULL);
+    json_print_key(indent, output, "classperms");
     if (avrule->is_extended) {
         json_print_str_or_cil_data(indent, output, avrule->perms.x.permx_str, CIL_PERMISSIONX, avrule->perms.x.permx, cil_node->line);
     } else {
@@ -376,11 +373,13 @@ DEFINE_JSON_NODE_TYPE(avrulex, struct cil_avrule)
 }
 DEFINE_JSON_NODE(deny, struct cil_deny_rule)
 {
-    json_print_kv(indent, output, "source", "%s", deny->src_str);
+    json_print_key(indent, output, "source");
+    json_print_string(output, deny->src_str);
     json_print_next(output);
-    json_print_kv(indent, output, "target", "%s", deny->tgt_str);
+    json_print_key(indent, output, "target");
+    json_print_string(output, deny->tgt_str);
     json_print_next(output);
-    json_print_kv(indent, output, "classperms", NULL);
+    json_print_key(indent, output, "classperms");
     if (deny->classperms->head->flavor == CIL_CLASSPERMS_SET) {
         struct cil_classperms_set *classpermsset = deny->classperms->head->data;
         json_print_string(output, classpermsset->set_str);
@@ -416,26 +415,30 @@ static void print_call_args(struct cil_tree_node *cil_node, int indent, FILE *ou
 DEFINE_JSON_NODE(call, struct cil_call)
 {
     (void)cil_node;
-    json_print_kv(indent, output, "macro", "%s", call->macro_str);
+    json_print_key(indent, output, "macro");
+    json_print_string(output, call->macro_str);
     json_print_next(output);
-    json_print_kv(indent, output, "args", NULL);
+    json_print_key(indent, output, "args");
     print_call_args(call->args_tree->root, indent, output);
 }
 DEFINE_JSON_NODE(macro, struct cil_macro)
 {
-    json_print_kv(indent, output, "id", "%s", macro->datum.name);
+    json_print_key(indent, output, "id");
+    json_print_string(output, macro->datum.name);
     json_print_next(output);
 
-    json_print_kv(indent, output, "params", NULL);
+    json_print_key(indent, output, "params");
     indent = json_array_start(indent, output);
     for (const struct cil_list_item *item = macro->params->head; item; item = item->next) {
         const struct cil_param *param = item->data;
         json_print_indent(indent, output);
         indent = json_object_start(indent, output);
         struct cil_tree_node param_node = { .flavor = param->flavor };
-        json_print_kv(indent, output, "type", "%s", cil_node_to_string(&param_node));
+        json_print_key(indent, output, "type");
+        json_print_string(output, cil_node_to_string(&param_node));
         json_print_next(output);
-        json_print_kv(indent, output, "name", "%s", param->str);
+        json_print_key(indent, output, "name");
+        json_print_string(output, param->str);
         indent = json_object_end(indent, output);
         if (item->next) {
             json_print_next(output);
@@ -454,9 +457,10 @@ DEFINE_JSON_NODE(macro, struct cil_macro)
 DEFINE_JSON_NODE(classperms, struct cil_classperms)
 {
     (void)cil_node;
-    json_print_kv(indent, output, "class", "%s", classperms->class_str);
+    json_print_key(indent, output, "class");
+    json_print_string(output, classperms->class_str);
     json_print_next(output);
-    json_print_kv(indent, output, "perms", NULL);
+    json_print_key(indent, output, "perms");
     json_print_expr(indent, output, classperms->perm_strs);
 }
 DEFINE_JSON_NODE_TYPE(common, struct cil_class)
@@ -468,15 +472,18 @@ DEFINE_JSON_NODE_TYPE(common, struct cil_class)
 DEFINE_JSON_NODE(classcommon, struct cil_classcommon)
 {
     (void)cil_node;
-    json_print_kv(indent, output, "class", "%s", classcommon->class_str);
+    json_print_key(indent, output, "class");
+    json_print_string(output, classcommon->class_str);
     json_print_next(output);
-    json_print_kv(indent, output, "common", "%s", classcommon->common_str);
+    json_print_key(indent, output, "common");
+    json_print_string(output, classcommon->common_str);
 }
 DEFINE_JSON_NODE(class, struct cil_class)
 {
-    json_print_kv(indent, output, "id", "%s", class->datum.name);
+    json_print_key(indent, output, "id");
+    json_print_string(output, class->datum.name);
     json_print_next(output);
-    json_print_kv(indent, output, "perms", NULL);
+    json_print_key(indent, output, "perms");
     indent = json_array_start(indent, output);
     for (const struct cil_tree_node *perm_node = cil_node->cl_head; perm_node; perm_node = perm_node->next) {
         assert(perm_node->flavor == CIL_PERM);
@@ -498,18 +505,20 @@ DEFINE_JSON_NODE_TYPE(classorder, struct cil_ordered)
 DEFINE_JSON_NODE_SIMPLE_DECL(classpermission, struct cil_classpermission)
 DEFINE_JSON_NODE(classpermissionset, struct cil_classpermissionset)
 {
-    json_print_kv(indent, output, "id", "%s", classpermissionset->set_str);
+    json_print_key(indent, output, "id");
+    json_print_string(output, classpermissionset->set_str);
     json_print_next(output);
-    json_print_kv(indent, output, "classperms", NULL);
+    json_print_key(indent, output, "classperms");
     assert(classpermissionset->classperms->head == classpermissionset->classperms->tail);
     assert(classpermissionset->classperms->head->flavor == CIL_CLASSPERMS);
     json_print_cil_data(indent, output, CIL_CLASSPERMS, classpermissionset->classperms->head->data, cil_node->line);
 }
 DEFINE_JSON_NODE(classmap, struct cil_class)
 {
-    json_print_kv(indent, output, "id", "%s", classmap->datum.name);
+    json_print_key(indent, output, "id");
+    json_print_string(output, classmap->datum.name);
     json_print_next(output);
-    json_print_kv(indent, output, "classmappings", NULL);
+    json_print_key(indent, output, "classmappings");
     indent = json_array_start(indent, output);
     for (const struct cil_tree_node *classmapping_node = cil_node->cl_head; classmapping_node; classmapping_node = classmapping_node->next) {
         assert(classmapping_node->flavor == CIL_MAP_PERM);
@@ -524,11 +533,13 @@ DEFINE_JSON_NODE(classmap, struct cil_class)
 }
 DEFINE_JSON_NODE(classmapping, struct cil_classmapping)
 {
-    json_print_kv(indent, output, "classmap", "%s", classmapping->map_class_str);
+    json_print_key(indent, output, "classmap");
+    json_print_string(output, classmapping->map_class_str);
     json_print_next(output);
-    json_print_kv(indent, output, "classmapping", "%s", classmapping->map_perm_str);
+    json_print_key(indent, output, "classmapping");
+    json_print_string(output, classmapping->map_perm_str);
     json_print_next(output);
-    json_print_kv(indent, output, "classperms", NULL);
+    json_print_key(indent, output, "classperms");
     assert(classmapping->classperms->head == classmapping->classperms->tail);
     if (classmapping->classperms->head->flavor == CIL_CLASSPERMS_SET) {
         struct cil_classperms_set *classpermsset = classmapping->classperms->head->data;
@@ -540,7 +551,8 @@ DEFINE_JSON_NODE(classmapping, struct cil_classmapping)
 DEFINE_JSON_NODE(permissionx, struct cil_permissionx)
 {
     (void)cil_node;
-    json_print_kv(indent, output, "id", "%s", permissionx->datum.name);
+    json_print_key(indent, output, "id");
+    json_print_string(output, permissionx->datum.name);
     json_print_next(output);
     const char *kind_str = NULL;
     switch (permissionx->kind) {
@@ -553,11 +565,13 @@ DEFINE_JSON_NODE(permissionx, struct cil_permissionx)
     default:
         assert(false /* unreachable */);
     }
-    json_print_kv(indent, output, "kind", "%s", kind_str);
+    json_print_key(indent, output, "kind");
+    json_print_string(output, kind_str);
     json_print_next(output);
-    json_print_kv(indent, output, "class", "%s", permissionx->obj_str);
+    json_print_key(indent, output, "class");
+    json_print_string(output, permissionx->obj_str);
     json_print_next(output);
-    json_print_kv(indent, output, "perms", NULL);
+    json_print_key(indent, output, "perms");
     json_print_expr(indent, output, permissionx->expr_str);
 }
 
@@ -568,23 +582,26 @@ DEFINE_JSON_NODE(permissionx, struct cil_permissionx)
 DEFINE_JSON_NODE(boolean, struct cil_bool)
 {
     (void)cil_node;
-    json_print_kv(indent, output, "id", "%s", boolean->datum.name);
+    json_print_key(indent, output, "id");
+    json_print_string(output, boolean->datum.name);
     json_print_next(output);
-    json_print_kv(indent, output, "value", "%b", boolean->value);
+    json_print_key(indent, output, "value");
+    json_print_bool(output, boolean->value);
 }
 DEFINE_JSON_NODE(booleanif, struct cil_booleanif)
 {
-    json_print_kv(indent, output, "condition", NULL);
+    json_print_key(indent, output, "condition");
     json_print_expr(indent, output, booleanif->str_expr);
     json_print_next(output);
-    json_print_kv(indent, output, "branches", NULL);
+    json_print_key(indent, output, "branches");
     indent = json_array_start(indent, output);
     for (struct cil_tree_node *condblock_node = cil_node->cl_head; condblock_node; condblock_node = condblock_node->next) {
         assert(condblock_node->flavor == CIL_CONDBLOCK);
         const struct cil_condblock *condblock = condblock_node->data;
         json_print_indent(indent, output);
         indent = json_object_start(indent, output);
-        json_print_kv(indent, output, "value", "%b", condblock->flavor == CIL_CONDTRUE);
+        json_print_key(indent, output, "value");
+        json_print_bool(output, condblock->flavor == CIL_CONDTRUE);
         json_print_next(output);
         json_print_cil_node_children(indent, output, NULL, condblock_node);
         indent = json_object_end(indent, output);
@@ -597,23 +614,26 @@ DEFINE_JSON_NODE(booleanif, struct cil_booleanif)
 DEFINE_JSON_NODE(tunable, struct cil_tunable)
 {
     (void)cil_node;
-    json_print_kv(indent, output, "id", "%s", tunable->datum.name);
+    json_print_key(indent, output, "id");
+    json_print_string(output, tunable->datum.name);
     json_print_next(output);
-    json_print_kv(indent, output, "value", "%b", tunable->value);
+    json_print_key(indent, output, "value");
+    json_print_bool(output, tunable->value);
 }
 DEFINE_JSON_NODE(tunableif, struct cil_tunableif)
 {
-    json_print_kv(indent, output, "condition", NULL);
+    json_print_key(indent, output, "condition");
     json_print_expr(indent, output, tunableif->str_expr);
     json_print_next(output);
-    json_print_kv(indent, output, "branches", NULL);
+    json_print_key(indent, output, "branches");
     indent = json_array_start(indent, output);
     for (struct cil_tree_node *condblock_node = cil_node->cl_head; condblock_node; condblock_node = condblock_node->next) {
         assert(condblock_node->flavor == CIL_CONDBLOCK);
         const struct cil_condblock *condblock = condblock_node->data;
         json_print_indent(indent, output);
         indent = json_object_start(indent, output);
-        json_print_kv(indent, output, "value", "%b", condblock->flavor == CIL_CONDTRUE);
+        json_print_key(indent, output, "value");
+        json_print_bool(output, condblock->flavor == CIL_CONDTRUE);
         json_print_next(output);
         json_print_cil_node_children(indent, output, NULL, condblock_node);
         indent = json_object_end(indent, output);
@@ -630,7 +650,7 @@ DEFINE_JSON_NODE(tunableif, struct cil_tunableif)
 
 DEFINE_JSON_NODE(constrain, struct cil_constrain)
 {
-    json_print_kv(indent, output, "classperms", NULL);
+    json_print_key(indent, output, "classperms");
     assert(constrain->classperms->head == constrain->classperms->tail);
     if (constrain->classperms->head->flavor == CIL_CLASSPERMS_SET) {
         struct cil_classperms_set *classpermsset = constrain->classperms->head->data;
@@ -639,15 +659,16 @@ DEFINE_JSON_NODE(constrain, struct cil_constrain)
         json_print_cil_data(indent, output, constrain->classperms->head->flavor, constrain->classperms->head->data, cil_node->line);
     }
     json_print_next(output);
-    json_print_kv(indent, output, "constraint", NULL);
+    json_print_key(indent, output, "constraint");
     json_print_expr(indent, output, constrain->str_expr);
 }
 DEFINE_JSON_NODE(validatetrans, struct cil_validatetrans)
 {
     (void)cil_node;
-    json_print_kv(indent, output, "class", "%s", validatetrans->class_str);
+    json_print_key(indent, output, "class");
+    json_print_string(output, validatetrans->class_str);
     json_print_next(output);
-    json_print_kv(indent, output, "constraint", NULL);
+    json_print_key(indent, output, "constraint");
     json_print_expr(indent, output, validatetrans->str_expr);
 }
 DEFINE_JSON_NODE_TYPE(mlsconstrain, struct cil_constrain)
@@ -669,31 +690,37 @@ DEFINE_JSON_NODE_TYPE(mlsvalidatetrans, struct cil_validatetrans)
 
 DEFINE_JSON_NODE(block, struct cil_block)
 {
-    json_print_kv(indent, output, "id", "%s", block->datum.name);
+    json_print_key(indent, output, "id");
+    json_print_string(output, block->datum.name);
     json_print_next(output);
     json_print_cil_node_children(indent, output, NULL, cil_node);
 }
 DEFINE_JSON_NODE(blockabstract, struct cil_blockabstract)
 {
     (void)cil_node;
-    json_print_kv(indent, output, "id", "%s", blockabstract->block_str);
+    json_print_key(indent, output, "id");
+    json_print_string(output, blockabstract->block_str);
 }
 DEFINE_JSON_NODE(blockinherit, struct cil_blockinherit)
 {
     (void)cil_node;
-    json_print_kv(indent, output, "template", "%s", blockinherit->block_str);
+    json_print_key(indent, output, "template");
+    json_print_string(output, blockinherit->block_str);
 }
 DEFINE_JSON_NODE(optional, struct cil_optional)
 {
-    json_print_kv(indent, output, "id", "%s", optional->datum.name);
+    json_print_key(indent, output, "id");
+    json_print_string(output, optional->datum.name);
     json_print_next(output);
     json_print_cil_node_children(indent, output, NULL, cil_node);
 }
 DEFINE_JSON_NODE(in, struct cil_in)
 {
-    json_print_kv(indent, output, "position", "%s", in->is_after ? CIL_KEY_IN_AFTER : CIL_KEY_IN_BEFORE);
+    json_print_key(indent, output, "position");
+    json_print_string(output, in->is_after ? CIL_KEY_IN_AFTER : CIL_KEY_IN_BEFORE);
     json_print_next(output);
-    json_print_kv(indent, output, "container", "%s", in->block_str);
+    json_print_key(indent, output, "container");
+    json_print_string(output, in->block_str);
     json_print_next(output);
     json_print_cil_node_children(indent, output, NULL, cil_node);
 }
@@ -704,15 +731,19 @@ DEFINE_JSON_NODE(in, struct cil_in)
 
 DEFINE_JSON_NODE(context, struct cil_context)
 {
-    json_print_kv(indent, output, "id", "%s", context->datum.name);
+    json_print_key(indent, output, "id");
+    json_print_string(output, context->datum.name);
     json_print_next(output);
-    json_print_kv(indent, output, "user", "%s", context->user_str);
+    json_print_key(indent, output, "user");
+    json_print_string(output, context->user_str);
     json_print_next(output);
-    json_print_kv(indent, output, "role", "%s", context->role_str);
+    json_print_key(indent, output, "role");
+    json_print_string(output, context->role_str);
     json_print_next(output);
-    json_print_kv(indent, output, "type", "%s", context->type_str);
+    json_print_key(indent, output, "type");
+    json_print_string(output, context->type_str);
     json_print_next(output);
-    json_print_kv(indent, output, "levelrange", NULL);
+    json_print_key(indent, output, "levelrange");
     json_print_str_or_cil_data(indent, output, context->range_str, CIL_LEVELRANGE, context->range, cil_node->line);
 }
 
@@ -723,7 +754,7 @@ DEFINE_JSON_NODE(context, struct cil_context)
 DEFINE_JSON_NODE(cil_default, struct cil_default)
 {
     (void)cil_node;
-    json_print_kv(indent, output, "class", NULL);
+    json_print_key(indent, output, "class");
     indent = json_array_start(indent, output);
     for (const struct cil_list_item *class_item = cil_default->class_strs->head; class_item; class_item = class_item->next) {
         json_print_indent(indent, output);
@@ -743,7 +774,8 @@ DEFINE_JSON_NODE(cil_default, struct cil_default)
         default_str = CIL_KEY_TARGET;
         break;
     }
-    json_print_kv(indent, output, "default", "%s", default_str);
+    json_print_key(indent, output, "default");
+    json_print_string(output, default_str);
 }
 DEFINE_JSON_NODE_TYPE(cil_default, struct cil_default)
 {
@@ -762,7 +794,7 @@ DEFINE_JSON_NODE_TYPE(cil_default, struct cil_default)
 DEFINE_JSON_NODE(defaultrange, struct cil_defaultrange)
 {
     (void)cil_node;
-    json_print_kv(indent, output, "class", NULL);
+    json_print_key(indent, output, "class");
     indent = json_array_start(indent, output);
     for (const struct cil_list_item *class_item = defaultrange->class_strs->head; class_item; class_item = class_item->next) {
         json_print_indent(indent, output);
@@ -807,9 +839,11 @@ DEFINE_JSON_NODE(defaultrange, struct cil_defaultrange)
         range_str = NULL;
         break;
     }
-    json_print_kv(indent, output, "default", "%s", default_str);
+    json_print_key(indent, output, "default");
+    json_print_string(output, default_str);
     json_print_next(output);
-    json_print_kv(indent, output, "range", "%s", range_str);
+    json_print_key(indent, output, "range");
+    json_print_string(output, range_str);
 }
 
 /******************************************************************************
@@ -818,7 +852,8 @@ DEFINE_JSON_NODE(defaultrange, struct cil_defaultrange)
 
 DEFINE_JSON_NODE(filecon, struct cil_filecon)
 {
-    json_print_kv(indent, output, "path", "%s", filecon->path_str);
+    json_print_key(indent, output, "path");
+    json_print_string(output, filecon->path_str);
     json_print_next(output);
     const char *file_type_str = NULL;
     switch (filecon->type) {
@@ -849,9 +884,10 @@ DEFINE_JSON_NODE(filecon, struct cil_filecon)
     default:
         assert(false /* unreachable */);
     }
-    json_print_kv(indent, output, "fileType", "%s", file_type_str);
+    json_print_key(indent, output, "fileType");
+    json_print_string(output, file_type_str);
     json_print_next(output);
-    json_print_kv(indent, output, "context", NULL);
+    json_print_key(indent, output, "context");
     json_print_str_or_cil_data(indent, output, filecon->context_str, CIL_CONTEXT, filecon->context, cil_node->line);
 }
 DEFINE_JSON_NODE(fsuse, struct cil_fsuse)
@@ -870,18 +906,22 @@ DEFINE_JSON_NODE(fsuse, struct cil_fsuse)
     default:
         assert(false /* unreachable */);
     }
-    json_print_kv(indent, output, "fsType", "%s", fstype_str);
+    json_print_key(indent, output, "fsType");
+    json_print_string(output, fstype_str);
     json_print_next(output);
-    json_print_kv(indent, output, "fsName", "%s", fsuse->fs_str);
+    json_print_key(indent, output, "fsName");
+    json_print_string(output, fsuse->fs_str);
     json_print_next(output);
-    json_print_kv(indent, output, "context", NULL);
+    json_print_key(indent, output, "context");
     json_print_str_or_cil_data(indent, output, fsuse->context_str, CIL_CONTEXT, fsuse->context, cil_node->line);
 }
 DEFINE_JSON_NODE(genfscon, struct cil_genfscon)
 {
-    json_print_kv(indent, output, "fsName", "%s", genfscon->fs_str);
+    json_print_key(indent, output, "fsName");
+    json_print_string(output, genfscon->fs_str);
     json_print_next(output);
-    json_print_kv(indent, output, "path", "%s", genfscon->path_str);
+    json_print_key(indent, output, "path");
+    json_print_string(output, genfscon->path_str);
     json_print_next(output);
     const char *file_type_str = NULL;
     switch (genfscon->file_type) {
@@ -912,9 +952,10 @@ DEFINE_JSON_NODE(genfscon, struct cil_genfscon)
     default:
         assert(false /* unreachable */);
     }
-    json_print_kv(indent, output, "fileType", "%s", file_type_str);
+    json_print_key(indent, output, "fileType");
+    json_print_string(output, file_type_str);
     json_print_next(output);
-    json_print_kv(indent, output, "context", NULL);
+    json_print_key(indent, output, "context");
     json_print_str_or_cil_data(indent, output, genfscon->context_str, CIL_CONTEXT, genfscon->context, cil_node->line);
 }
 
@@ -924,22 +965,27 @@ DEFINE_JSON_NODE(genfscon, struct cil_genfscon)
 
 DEFINE_JSON_NODE(ibpkeycon, struct cil_ibpkeycon)
 {
-    json_print_kv(indent, output, "subnet", "%s", ibpkeycon->subnet_prefix_str);
+    json_print_key(indent, output, "subnet");
+    json_print_string(output, ibpkeycon->subnet_prefix_str);
     json_print_next(output);
-    json_print_kv(indent, output, "pkeyLow", "%" PRIu32, ibpkeycon->pkey_low);
+    json_print_key(indent, output, "pkeyLow");
+    json_print_uint(output, ibpkeycon->pkey_low);
     json_print_next(output);
-    json_print_kv(indent, output, "pkeyHigh", "%" PRIu32, ibpkeycon->pkey_high);
+    json_print_key(indent, output, "pkeyHigh");
+    json_print_uint(output, ibpkeycon->pkey_high);
     json_print_next(output);
-    json_print_kv(indent, output, "context", NULL);
+    json_print_key(indent, output, "context");
     json_print_str_or_cil_data(indent, output, ibpkeycon->context_str, CIL_CONTEXT, ibpkeycon->context, cil_node->line);
 }
 DEFINE_JSON_NODE(ibendportcon, struct cil_ibendportcon)
 {
-    json_print_kv(indent, output, "device", "%s", ibendportcon->dev_name_str);
+    json_print_key(indent, output, "device");
+    json_print_string(output, ibendportcon->dev_name_str);
     json_print_next(output);
-    json_print_kv(indent, output, "port", "%" PRIu32, ibendportcon->port);
+    json_print_key(indent, output, "port");
+    json_print_uint(output, ibendportcon->port);
     json_print_next(output);
-    json_print_kv(indent, output, "context", NULL);
+    json_print_key(indent, output, "context");
     json_print_str_or_cil_data(indent, output, ibendportcon->context_str, CIL_CONTEXT, ibendportcon->context, cil_node->line);
 }
 
@@ -968,27 +1014,31 @@ DEFINE_JSON_NODE_TYPE(categoryorder, struct cil_ordered)
 DEFINE_JSON_NODE(categoryset, struct cil_catset)
 {
     (void)cil_node;
-    json_print_kv(indent, output, "id", "%s", categoryset->datum.name);
+    json_print_key(indent, output, "id");
+    json_print_string(output, categoryset->datum.name);
     json_print_next(output);
-    json_print_kv(indent, output, "category", NULL);
+    json_print_key(indent, output, "category");
     json_print_expr(indent, output, categoryset->cats->str_expr);
 }
 DEFINE_JSON_NODE(sensitivitycategory, struct cil_senscat)
 {
     (void)cil_node;
-    json_print_kv(indent, output, "sensitivity", "%s", sensitivitycategory->sens_str);
+    json_print_key(indent, output, "sensitivity");
+    json_print_string(output, sensitivitycategory->sens_str);
     json_print_next(output);
-    json_print_kv(indent, output, "category", NULL);
+    json_print_key(indent, output, "category");
     json_print_expr(indent, output, sensitivitycategory->cats->str_expr);
 }
 DEFINE_JSON_NODE(level, struct cil_level)
 {
     (void)cil_node;
-    json_print_kv(indent, output, "id", "%s", level->datum.name);
+    json_print_key(indent, output, "id");
+    json_print_string(output, level->datum.name);
     json_print_next(output);
-    json_print_kv(indent, output, "sensitivity", "%s", level->sens_str);
+    json_print_key(indent, output, "sensitivity");
+    json_print_string(output, level->sens_str);
     json_print_next(output);
-    json_print_kv(indent, output, "category", NULL);
+    json_print_key(indent, output, "category");
     if (level->cats) {
         json_print_expr(indent, output, level->cats->str_expr);
     } else {
@@ -997,23 +1047,27 @@ DEFINE_JSON_NODE(level, struct cil_level)
 }
 DEFINE_JSON_NODE(levelrange, struct cil_levelrange)
 {
-    json_print_kv(indent, output, "id", "%s", levelrange->datum.name);
+    json_print_key(indent, output, "id");
+    json_print_string(output, levelrange->datum.name);
     json_print_next(output);
-    json_print_kv(indent, output, "low", NULL);
+    json_print_key(indent, output, "low");
     json_print_str_or_cil_data(indent, output, levelrange->low_str, CIL_LEVEL, levelrange->low, cil_node->line);
     json_print_next(output);
-    json_print_kv(indent, output, "high", NULL);
+    json_print_key(indent, output, "high");
     json_print_str_or_cil_data(indent, output, levelrange->high_str, CIL_LEVEL, levelrange->high, cil_node->line);
 }
 DEFINE_JSON_NODE(rangetransition, struct cil_rangetransition)
 {
-    json_print_kv(indent, output, "source", "%s", rangetransition->src_str);
+    json_print_key(indent, output, "source");
+    json_print_string(output, rangetransition->src_str);
     json_print_next(output);
-    json_print_kv(indent, output, "target", "%s", rangetransition->exec_str);
+    json_print_key(indent, output, "target");
+    json_print_string(output, rangetransition->exec_str);
     json_print_next(output);
-    json_print_kv(indent, output, "class", "%s", rangetransition->obj_str);
+    json_print_key(indent, output, "class");
+    json_print_string(output, rangetransition->obj_str);
     json_print_next(output);
-    json_print_kv(indent, output, "range", NULL);
+    json_print_key(indent, output, "range");
     json_print_str_or_cil_data(indent, output, rangetransition->range_str, CIL_LEVELRANGE, rangetransition->range, cil_node->line);
 }
 
@@ -1024,33 +1078,36 @@ DEFINE_JSON_NODE(rangetransition, struct cil_rangetransition)
 DEFINE_JSON_NODE(ipaddr, struct cil_ipaddr)
 {
     (void)cil_node;
-    json_print_kv(indent, output, "id", "%s", ipaddr->datum.name);
+    json_print_key(indent, output, "id");
+    json_print_string(output, ipaddr->datum.name);
     json_print_next(output);
     char ip_str[40] = {'\0'};
     if (!inet_ntop(ipaddr->family, &ipaddr->ip, ip_str, sizeof(ip_str))) {
         error(EXIT_FAILURE, errno, "Failed to convert IP to string");
     }
-    json_print_kv(indent, output, "ip", "%s", ip_str);
+    json_print_key(indent, output, "ip");
+    json_print_string(output, ip_str);
 }
 DEFINE_JSON_NODE(netifcon, struct cil_netifcon)
 {
-    json_print_kv(indent, output, "ifName", "%s", netifcon->interface_str);
+    json_print_key(indent, output, "ifName");
+    json_print_string(output, netifcon->interface_str);
     json_print_next(output);
-    json_print_kv(indent, output, "ifContext", NULL);
+    json_print_key(indent, output, "ifContext");
     json_print_str_or_cil_data(indent, output, netifcon->if_context_str, CIL_CONTEXT, netifcon->if_context, cil_node->line);
     json_print_next(output);
-    json_print_kv(indent, output, "packetContext", NULL);
+    json_print_key(indent, output, "packetContext");
     json_print_str_or_cil_data(indent, output, netifcon->packet_context_str, CIL_CONTEXT, netifcon->packet_context, cil_node->line);
 }
 DEFINE_JSON_NODE(nodecon, struct cil_nodecon)
 {
-    json_print_kv(indent, output, "subnet", NULL);
+    json_print_key(indent, output, "subnet");
     json_print_str_or_cil_data(indent, output, nodecon->addr_str, CIL_IPADDR, nodecon->addr, cil_node->line);
     json_print_next(output);
-    json_print_kv(indent, output, "mask", NULL);
+    json_print_key(indent, output, "mask");
     json_print_str_or_cil_data(indent, output, nodecon->mask_str, CIL_IPADDR, nodecon->mask, cil_node->line);
     json_print_next(output);
-    json_print_kv(indent, output, "context", NULL);
+    json_print_key(indent, output, "context");
     json_print_str_or_cil_data(indent, output, nodecon->context_str, CIL_CONTEXT, nodecon->context, cil_node->line);
 }
 DEFINE_JSON_NODE(portcon, struct cil_portcon)
@@ -1072,13 +1129,16 @@ DEFINE_JSON_NODE(portcon, struct cil_portcon)
     default:
         assert(false /* unreachable */);
     }
-    json_print_kv(indent, output, "protocol", "%s", proto_str);
+    json_print_key(indent, output, "protocol");
+    json_print_string(output, proto_str);
     json_print_next(output);
-    json_print_kv(indent, output, "portLow", "%" PRIu32, portcon->port_low);
+    json_print_key(indent, output, "portLow");
+    json_print_uint(output, portcon->port_low);
     json_print_next(output);
-    json_print_kv(indent, output, "portHigh", "%" PRIu32, portcon->port_high);
+    json_print_key(indent, output, "portHigh");
+    json_print_uint(output, portcon->port_high);
     json_print_next(output);
-    json_print_kv(indent, output, "context", NULL);
+    json_print_key(indent, output, "context");
     json_print_str_or_cil_data(indent, output, portcon->context_str, CIL_CONTEXT, portcon->context, cil_node->line);
 }
 
@@ -1089,7 +1149,8 @@ DEFINE_JSON_NODE(portcon, struct cil_portcon)
 DEFINE_JSON_NODE(mls, struct cil_mls)
 {
     (void)cil_node;
-    json_print_kv(indent, output, "value", "%b", mls->value);
+    json_print_key(indent, output, "value");
+    json_print_bool(output, mls->value);
 }
 DEFINE_JSON_NODE(handleunknown, struct cil_handleunknown)
 {
@@ -1108,7 +1169,8 @@ DEFINE_JSON_NODE(handleunknown, struct cil_handleunknown)
     default:
         assert(false /* unreachable */);
     }
-    json_print_kv(indent, output, "action", "%s", action_str);
+    json_print_key(indent, output, "action");
+    json_print_string(output, action_str);
 }
 DEFINE_JSON_NODE_SIMPLE_DECL(policycap, struct cil_policycap)
 
@@ -1120,36 +1182,45 @@ DEFINE_JSON_NODE_SIMPLE_DECL(role, struct cil_role)
 DEFINE_JSON_NODE(roletype, struct cil_roletype)
 {
     (void)cil_node;
-    json_print_kv(indent, output, "role", "%s", roletype->role_str);
+    json_print_key(indent, output, "role");
+    json_print_string(output, roletype->role_str);
     json_print_next(output);
-    json_print_kv(indent, output, "type", "%s", roletype->type_str);
+    json_print_key(indent, output, "type");
+    json_print_string(output, roletype->type_str);
 }
 DEFINE_JSON_NODE_SIMPLE_DECL(roleattribute, struct cil_roleattribute)
 DEFINE_JSON_NODE(roleattributeset, struct cil_roleattributeset)
 {
     (void)cil_node;
-    json_print_kv(indent, output, "roleattribute", "%s", roleattributeset->attr_str);
+    json_print_key(indent, output, "roleattribute");
+    json_print_string(output, roleattributeset->attr_str);
     json_print_next(output);
-    json_print_kv(indent, output, "roles", NULL);
+    json_print_key(indent, output, "roles");
     json_print_expr(indent, output, roleattributeset->str_expr);
 }
 DEFINE_JSON_NODE(roleallow, struct cil_roleallow)
 {
     (void)cil_node;
-    json_print_kv(indent, output, "source", "%s", roleallow->src_str);
+    json_print_key(indent, output, "source");
+    json_print_string(output, roleallow->src_str);
     json_print_next(output);
-    json_print_kv(indent, output, "target", "%s", roleallow->tgt_str);
+    json_print_key(indent, output, "target");
+    json_print_string(output, roleallow->tgt_str);
 }
 DEFINE_JSON_NODE(roletransition, struct cil_roletransition)
 {
     (void)cil_node;
-    json_print_kv(indent, output, "source", "%s", roletransition->src_str);
+    json_print_key(indent, output, "source");
+    json_print_string(output, roletransition->src_str);
     json_print_next(output);
-    json_print_kv(indent, output, "target", "%s", roletransition->tgt_str);
+    json_print_key(indent, output, "target");
+    json_print_string(output, roletransition->tgt_str);
     json_print_next(output);
-    json_print_kv(indent, output, "class", "%s", roletransition->obj_str);
+    json_print_key(indent, output, "class");
+    json_print_string(output, roletransition->obj_str);
     json_print_next(output);
-    json_print_kv(indent, output, "result", "%s", roletransition->result_str);
+    json_print_key(indent, output, "result");
+    json_print_string(output, roletransition->result_str);
 }
 DEFINE_JSON_NODE_TYPE(rolebounds, struct cil_bounds)
 {
@@ -1171,9 +1242,10 @@ DEFINE_JSON_NODE_TYPE(sidorder, struct cil_ordered)
 }
 DEFINE_JSON_NODE(sidcontext, struct cil_sidcontext)
 {
-    json_print_kv(indent, output, "sid", "%s", sidcontext->sid_str);
+    json_print_key(indent, output, "sid");
+    json_print_string(output, sidcontext->sid_str);
     json_print_next(output);
-    json_print_kv(indent, output, "context", NULL);
+    json_print_key(indent, output, "context");
     json_print_str_or_cil_data(indent, output, sidcontext->context_str, CIL_CONTEXT, sidcontext->context, cil_node->line);
 }
 
@@ -1188,15 +1260,16 @@ DEFINE_JSON_NODE_SIMPLE_DECL(typeattribute, struct cil_typeattribute)
 DEFINE_JSON_NODE(typeattributeset, struct cil_typeattributeset)
 {
     (void)cil_node;
-    json_print_kv(indent, output, "typeattribute", "%s", typeattributeset->attr_str);
+    json_print_key(indent, output, "typeattribute");
+    json_print_string(output, typeattributeset->attr_str);
     json_print_next(output);
-    json_print_kv(indent, output, "types", NULL);
+    json_print_key(indent, output, "types");
     json_print_expr(indent, output, typeattributeset->str_expr);
 }
 DEFINE_JSON_NODE(expandtypeattribute, struct cil_expandtypeattribute)
 {
     (void)cil_node;
-    json_print_kv(indent, output, "types", NULL);
+    json_print_key(indent, output, "types");
     indent = json_array_start(indent, output);
     for (const struct cil_list_item *item = expandtypeattribute->attr_strs->head; item; item = item->next) {
         assert(item->flavor == CIL_STRING);
@@ -1207,7 +1280,8 @@ DEFINE_JSON_NODE(expandtypeattribute, struct cil_expandtypeattribute)
     }
     indent = json_array_end(indent, output);
     json_print_next(output);
-    json_print_kv(indent, output, "expand", "%b", expandtypeattribute->expand);
+    json_print_key(indent, output, "expand");
+    json_print_bool(output, expandtypeattribute->expand);
 }
 DEFINE_JSON_NODE_TYPE(typebounds, struct cil_bounds)
 {
@@ -1218,13 +1292,17 @@ DEFINE_JSON_NODE_TYPE(typebounds, struct cil_bounds)
 DEFINE_JSON_NODE(type_rule, struct cil_type_rule)
 {
     (void)cil_node;
-    json_print_kv(indent, output, "source", "%s", type_rule->src_str);
+    json_print_key(indent, output, "source");
+    json_print_string(output, type_rule->src_str);
     json_print_next(output);
-    json_print_kv(indent, output, "target", "%s", type_rule->tgt_str);
+    json_print_key(indent, output, "target");
+    json_print_string(output, type_rule->tgt_str);
     json_print_next(output);
-    json_print_kv(indent, output, "class", "%s", type_rule->obj_str);
+    json_print_key(indent, output, "class");
+    json_print_string(output, type_rule->obj_str);
     json_print_next(output);
-    json_print_kv(indent, output, "result", "%s", type_rule->result_str);
+    json_print_key(indent, output, "result");
+    json_print_string(output, type_rule->result_str);
 }
 DEFINE_JSON_NODE_TYPE(type_rule, struct cil_type_rule)
 {
@@ -1243,15 +1321,20 @@ DEFINE_JSON_NODE_TYPE(type_rule, struct cil_type_rule)
 DEFINE_JSON_NODE(nametypetransition, struct cil_nametypetransition)
 {
     (void)cil_node;
-    json_print_kv(indent, output, "source", "%s", nametypetransition->src_str);
+    json_print_key(indent, output, "source");
+    json_print_string(output, nametypetransition->src_str);
     json_print_next(output);
-    json_print_kv(indent, output, "target", "%s", nametypetransition->tgt_str);
+    json_print_key(indent, output, "target");
+    json_print_string(output, nametypetransition->tgt_str);
     json_print_next(output);
-    json_print_kv(indent, output, "class", "%s", nametypetransition->obj_str);
+    json_print_key(indent, output, "class");
+    json_print_string(output, nametypetransition->obj_str);
     json_print_next(output);
-    json_print_kv(indent, output, "name", "%s", nametypetransition->name_str);
+    json_print_key(indent, output, "name");
+    json_print_string(output, nametypetransition->name_str);
     json_print_next(output);
-    json_print_kv(indent, output, "result", "%s", nametypetransition->result_str);
+    json_print_key(indent, output, "result");
+    json_print_string(output, nametypetransition->result_str);
 }
 DEFINE_JSON_NODE_TYPE(nametypetransition, struct cil_nametypetransition)
 {
@@ -1262,7 +1345,8 @@ DEFINE_JSON_NODE_TYPE(nametypetransition, struct cil_nametypetransition)
 DEFINE_JSON_NODE(typepermissive, struct cil_typepermissive)
 {
     (void)cil_node;
-    json_print_kv(indent, output, "type", "%s", typepermissive->type_str);
+    json_print_key(indent, output, "type");
+    json_print_string(output, typepermissive->type_str);
 }
 
 /******************************************************************************
@@ -1273,31 +1357,36 @@ DEFINE_JSON_NODE_SIMPLE_DECL(user, struct cil_user)
 DEFINE_JSON_NODE(userrole, struct cil_userrole)
 {
     (void)cil_node;
-    json_print_kv(indent, output, "user", "%s", userrole->user_str);
+    json_print_key(indent, output, "user");
+    json_print_string(output, userrole->user_str);
     json_print_next(output);
-    json_print_kv(indent, output, "role", "%s", userrole->role_str);
+    json_print_key(indent, output, "role");
+    json_print_string(output, userrole->role_str);
 }
 DEFINE_JSON_NODE_SIMPLE_DECL(userattribute, struct cil_userattribute)
 DEFINE_JSON_NODE(userattributeset, struct cil_userattributeset)
 {
     (void)cil_node;
-    json_print_kv(indent, output, "userattribute", "%s", userattributeset->attr_str);
+    json_print_key(indent, output, "userattribute");
+    json_print_string(output, userattributeset->attr_str);
     json_print_next(output);
-    json_print_kv(indent, output, "users", NULL);
+    json_print_key(indent, output, "users");
     json_print_expr(indent, output, userattributeset->str_expr);
 }
 DEFINE_JSON_NODE(userlevel, struct cil_userlevel)
 {
-    json_print_kv(indent, output, "user", "%s", userlevel->user_str);
+    json_print_key(indent, output, "user");
+    json_print_string(output, userlevel->user_str);
     json_print_next(output);
-    json_print_kv(indent, output, "level", NULL);
+    json_print_key(indent, output, "level");
     json_print_str_or_cil_data(indent, output, userlevel->level_str, CIL_LEVEL, userlevel->level, cil_node->line);
 }
 DEFINE_JSON_NODE(userrange, struct cil_userrange)
 {
-    json_print_kv(indent, output, "user", "%s", userrange->user_str);
+    json_print_key(indent, output, "user");
+    json_print_string(output, userrange->user_str);
     json_print_next(output);
-    json_print_kv(indent, output, "range", NULL);
+    json_print_key(indent, output, "range");
     json_print_str_or_cil_data(indent, output, userrange->range_str, CIL_LEVELRANGE, userrange->range, cil_node->line);
 }
 DEFINE_JSON_NODE_TYPE(userbounds, struct cil_bounds)
@@ -1309,24 +1398,29 @@ DEFINE_JSON_NODE_TYPE(userbounds, struct cil_bounds)
 DEFINE_JSON_NODE(userprefix, struct cil_userprefix)
 {
     (void)cil_node;
-    json_print_kv(indent, output, "user", "%s", userprefix->user_str);
+    json_print_key(indent, output, "user");
+    json_print_string(output, userprefix->user_str);
     json_print_next(output);
-    json_print_kv(indent, output, "prefix", "%s", userprefix->prefix_str);
+    json_print_key(indent, output, "prefix");
+    json_print_string(output, userprefix->prefix_str);
 }
 DEFINE_JSON_NODE(selinuxuser, struct cil_selinuxuser)
 {
-    json_print_kv(indent, output, "name", "%s", selinuxuser->name_str);
+    json_print_key(indent, output, "name");
+    json_print_string(output, selinuxuser->name_str);
     json_print_next(output);
-    json_print_kv(indent, output, "user", "%s", selinuxuser->user_str);
+    json_print_key(indent, output, "user");
+    json_print_string(output, selinuxuser->user_str);
     json_print_next(output);
-    json_print_kv(indent, output, "range", NULL);
+    json_print_key(indent, output, "range");
     json_print_str_or_cil_data(indent, output, selinuxuser->range_str, CIL_LEVELRANGE, selinuxuser->range, cil_node->line);
 }
 DEFINE_JSON_NODE(selinuxuserdefault, struct cil_selinuxuser)
 {
-    json_print_kv(indent, output, "user", "%s", selinuxuserdefault->user_str);
+    json_print_key(indent, output, "user");
+    json_print_string(output, selinuxuserdefault->user_str);
     json_print_next(output);
-    json_print_kv(indent, output, "range", NULL);
+    json_print_key(indent, output, "range");
     json_print_str_or_cil_data(indent, output, selinuxuserdefault->range_str, CIL_LEVELRANGE, selinuxuserdefault->range, cil_node->line);
 }
 
@@ -1336,41 +1430,48 @@ DEFINE_JSON_NODE(selinuxuserdefault, struct cil_selinuxuser)
 
 DEFINE_JSON_NODE(iomemcon, struct cil_iomemcon)
 {
-    json_print_kv(indent, output, "memAddrLow", "%" PRIu64, iomemcon->iomem_low);
+    json_print_key(indent, output, "memAddrLow");
+    json_print_uint(output, iomemcon->iomem_low);
     json_print_next(output);
-    json_print_kv(indent, output, "memAddrHigh", "%" PRIu64, iomemcon->iomem_high);
+    json_print_key(indent, output, "memAddrHigh");
+    json_print_uint(output, iomemcon->iomem_high);
     json_print_next(output);
-    json_print_kv(indent, output, "context", NULL);
+    json_print_key(indent, output, "context");
     json_print_str_or_cil_data(indent, output, iomemcon->context_str, CIL_CONTEXT, iomemcon->context, cil_node->line);
 }
 DEFINE_JSON_NODE(ioportcon, struct cil_ioportcon)
 {
-    json_print_kv(indent, output, "portLow", "%" PRIu32, ioportcon->ioport_low);
+    json_print_key(indent, output, "portLow");
+    json_print_uint(output, ioportcon->ioport_low);
     json_print_next(output);
-    json_print_kv(indent, output, "portHigh", "%" PRIu32, ioportcon->ioport_high);
+    json_print_key(indent, output, "portHigh");
+    json_print_uint(output, ioportcon->ioport_high);
     json_print_next(output);
-    json_print_kv(indent, output, "context", NULL);
+    json_print_key(indent, output, "context");
     json_print_str_or_cil_data(indent, output, ioportcon->context_str, CIL_CONTEXT, ioportcon->context, cil_node->line);
 }
 DEFINE_JSON_NODE(pcidevicecon, struct cil_pcidevicecon)
 {
-    json_print_kv(indent, output, "device", "%" PRIu32, pcidevicecon->dev);
+    json_print_key(indent, output, "device");
+    json_print_uint(output, pcidevicecon->dev);
     json_print_next(output);
-    json_print_kv(indent, output, "context", NULL);
+    json_print_key(indent, output, "context");
     json_print_str_or_cil_data(indent, output, pcidevicecon->context_str, CIL_CONTEXT, pcidevicecon->context, cil_node->line);
 }
 DEFINE_JSON_NODE(pirqcon, struct cil_pirqcon)
 {
-    json_print_kv(indent, output, "irq", "%" PRIu32, pirqcon->pirq);
+    json_print_key(indent, output, "irq");
+    json_print_uint(output, pirqcon->pirq);
     json_print_next(output);
-    json_print_kv(indent, output, "context", NULL);
+    json_print_key(indent, output, "context");
     json_print_str_or_cil_data(indent, output, pirqcon->context_str, CIL_CONTEXT, pirqcon->context, cil_node->line);
 }
 DEFINE_JSON_NODE(devicetreecon, struct cil_devicetreecon)
 {
-    json_print_kv(indent, output, "path", "%s", devicetreecon->path);
+    json_print_key(indent, output, "path");
+    json_print_string(output, devicetreecon->path);
     json_print_next(output);
-    json_print_kv(indent, output, "context", NULL);
+    json_print_key(indent, output, "context");
     json_print_str_or_cil_data(indent, output, devicetreecon->context_str, CIL_CONTEXT, devicetreecon->context, cil_node->line);
 }
 
@@ -1507,9 +1608,11 @@ static void json_print_cil_node_info(int indent, FILE *output, struct cil_tree_n
     }
     const struct json_cil_node_def *def = &cil_node_defs[cil_node->flavor];
 
-    json_print_kv(indent, output, "flavor", "%s", def->type_fn ? def->type_fn(cil_node) : def->type);
+    json_print_key(indent, output, "flavor");
+    json_print_string(output, def->type_fn ? def->type_fn(cil_node) : def->type);
     json_print_next(output);
-    json_print_kv(indent, output, "line", "%" PRIu32, cil_node->line);
+    json_print_key(indent, output, "line");
+    json_print_uint(output, cil_node->line);
 }
 
 static void json_print_cil_node(int indent, FILE *output, struct cil_tree_node *cil_node)
@@ -1545,14 +1648,16 @@ static void json_print_diff(int indent, FILE *output, const struct diff *diff)
     default:
         assert(false /* Unreachable */);
     }
-    json_print_kv(indent, output, "side", "%s", side_str);
+    json_print_key(indent, output, "side");
+    json_print_string(output, side_str);
     json_print_next(output);
-    json_print_kv(indent, output, "hash", NULL);
+    json_print_key(indent, output, "hash");
     json_print_hash(output, diff->node->full_hash);
     json_print_next(output);
-    json_print_kv(indent, output, "description", "%s", diff->decription);
+    json_print_key(indent, output, "description");
+    json_print_string(output, diff->decription);
     json_print_next(output);
-    json_print_kv(indent, output, "node", NULL);
+    json_print_key(indent, output, "node");
     json_print_cil_node(indent, output, diff->node->cil_node);
 
     indent = json_object_end(indent, output);
@@ -1564,7 +1669,7 @@ static void json_print_diff_context(const struct cmp_node *node, int indent, FIL
 
     json_print_cil_node_info(indent, output, node->cil_node);
     json_print_next(output);
-    json_print_kv(indent, output, "hash", NULL);
+    json_print_key(indent, output, "hash");
     json_print_hash(output, node->full_hash);
 
     indent = json_object_end(indent, output);
@@ -1574,14 +1679,14 @@ static void json_print_diff_tree_node(const struct diff_tree_node *diff_node, in
 {
     indent = json_object_start(indent, output);
 
-    json_print_kv(indent, output, "left", NULL);
+    json_print_key(indent, output, "left");
     json_print_diff_context(diff_node->left_node, indent, output);
     json_print_next(output);
-    json_print_kv(indent, output, "right", NULL);
+    json_print_key(indent, output, "right");
     json_print_diff_context(diff_node->right_node, indent, output);
     json_print_next(output);
 
-    json_print_kv(indent, output, "diffs", NULL);
+    json_print_key(indent, output, "diffs");
     indent = json_array_start(indent, output);
     for (const struct diff *diff = diff_node->dl_head; diff; diff = diff->next) {
         json_print_indent(indent, output);
@@ -1593,7 +1698,7 @@ static void json_print_diff_tree_node(const struct diff_tree_node *diff_node, in
     indent = json_array_end(indent, output);
     json_print_next(output);
 
-    json_print_kv(indent, output, "children", NULL);
+    json_print_key(indent, output, "children");
     indent = json_array_start(indent, output);
     for (const struct diff_tree_node *child = diff_node->cl_head; child; child = child->next) {
         json_print_indent(indent, output);
