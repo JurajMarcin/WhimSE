@@ -7,7 +7,6 @@ from whimse.report.common import (
     PolicyModuleReportFormatter,
     ReportFormatter,
 )
-from whimse.types.cildiff import CilDiffNode
 
 
 def _indent(string: str | Any, size: int) -> str:

@@ -29,6 +29,69 @@ class DistPolicyExplorer(PolicyExplorer[DistPolicy]):
     def policy_store(self) -> Path:
         return self._config.shadow_policy_store_path
 
+    def _fetch_dist_local(
+        self, modules_by_source: dict[PolicyModuleSource, set[PolicyModule]]
+    ) -> Iterable[DistPolicyModule]:
+        for source, source_modules in modules_by_source.items():
+            if (
+                not source_modules
+                or source.install_method != PolicyModuleInstallMethod.SEMODULE
+            ):
+                continue
+            for module in source_modules.copy():
+                _logger.debug(
+                    "Fetching files of module %r from local files",
+                    module,
+                )
+                try:
+                    for _, file in module.files:
+                        target_file = self._config.shadow_root_path / file.lstrip("/")
+                        target_file.parent.mkdir(exist_ok=True, parents=True)
+                        shutil.copy(file, target_file)
+                    yield DistPolicyModule(module, source)
+                except FileNotFoundError as ex:
+                    _logger.warning(
+                        "Could not fetch local file %r from module %r, "
+                        "will try to use another method",
+                        ex.filename,
+                        module,
+                    )
+
+    def _fetch_dist_package(
+        self,
+        fetch_method: ModuleFetchMethod,
+        modules_by_source: dict[PolicyModuleSource, set[PolicyModule]],
+    ) -> Iterable[DistPolicyModule]:
+        for source, source_modules in modules_by_source.items():
+            if not source_modules:
+                continue
+            _logger.debug(
+                "Fetching files of modules %r from %s package",
+                source_modules,
+                (
+                    "newer"
+                    if fetch_method == ModuleFetchMethod.NEWER_PACKAGE
+                    else "exact"
+                ),
+            )
+            files = list(file for module in source_modules for _, file in module.files)
+            assert files, (
+                "Modules without files should have been already yielded "
+                f"{source=} {source_modules=} {files=}"
+            )
+            try:
+                fetch_package = self._package_manager.fetch_package_files(
+                    source.source_package,
+                    files,
+                    fetch_method == ModuleFetchMethod.EXACT_PACKAGE,
+                )
+                yield from (
+                    DistPolicyModule(module, source.with_fetch_package(fetch_package))
+                    for module in source_modules
+                )
+            except FetchPackageError:
+                pass
+
     def _fetch_dist_modules(
         self, dist_modules: Iterable[DistPolicyModule]
     ) -> Iterable[DistPolicyModule]:
@@ -43,68 +106,16 @@ class DistPolicyExplorer(PolicyExplorer[DistPolicy]):
 
         for fetch_method in self._config.module_fetch_methods:
             if fetch_method == ModuleFetchMethod.LOCAL_MODULE:
-                for source, source_modules in modules_by_source.items():
-                    if (
-                        not source_modules
-                        or source.install_method != PolicyModuleInstallMethod.SEMODULE
-                    ):
-                        continue
-                    for module in source_modules.copy():
-                        _logger.debug(
-                            "Fetching files of module %r from local files",
-                            module,
-                        )
-                        try:
-                            for _, file in module.files:
-                                target_file = (
-                                    self._config.shadow_root_path / file.lstrip("/")
-                                )
-                                target_file.parent.mkdir(exist_ok=True, parents=True)
-                                shutil.copy(file, target_file)
-                            yield DistPolicyModule(module, source)
-                            source_modules.remove(module)
-                        except FileNotFoundError as ex:
-                            _logger.warning(
-                                "Could not fetch local file %r from module %r, "
-                                "will try to use another method",
-                                ex.filename,
-                                module,
-                            )
+                fetched_modules = set(self._fetch_dist_local(modules_by_source))
             else:
-                for source, source_modules in modules_by_source.items():
-                    if not source_modules:
-                        continue
-                    _logger.debug(
-                        "Fetching files of modules %r from %s package",
-                        source_modules,
-                        (
-                            "newer"
-                            if fetch_method == ModuleFetchMethod.NEWER_PACKAGE
-                            else "exact"
-                        ),
-                    )
-                    files = list(
-                        file for module in source_modules for _, file in module.files
-                    )
-                    assert files, (
-                        "Modules without files should have been already yielded "
-                        f"{source=} {source_modules=} {files=}"
-                    )
-                    try:
-                        fetch_package = self._package_manager.fetch_package_files(
-                            source.source_package,
-                            files,
-                            fetch_method == ModuleFetchMethod.EXACT_PACKAGE,
-                        )
-                        yield from (
-                            DistPolicyModule(
-                                module, source.with_fetch_package(fetch_package)
-                            )
-                            for module in source_modules
-                        )
-                        source_modules.clear()
-                    except FetchPackageError:
-                        pass
+                fetched_modules = set(
+                    self._fetch_dist_package(fetch_method, modules_by_source)
+                )
+            for fetched_module in fetched_modules:
+                modules_by_source[
+                    fetched_module.source.with_fetch_package(None)
+                ].remove(fetched_module.module)
+                yield fetched_module
 
         unfetched_modules = set(
             (module, source)

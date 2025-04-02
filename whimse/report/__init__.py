@@ -14,5 +14,3 @@ def report_formatter_factory(config: Config, report: Report) -> ReportFormatter:
             return HTMLReportFormatter(config, report)
         case ReportFormat.JSON:
             return JSONReportFormattter(config, report)
-        case _:
-            raise ValueError("Invalid report format %r", format)

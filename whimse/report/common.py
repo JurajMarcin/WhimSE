@@ -2,7 +2,6 @@ from collections.abc import Iterable
 from typing import TextIO
 
 from whimse.config import Config
-from whimse.detect.common import ChangesDetector
 from whimse.types.cildiff import CilDiff, CilDiffNode, CilDiffSide
 from whimse.types.reports import (
     BaseReport,
@@ -22,7 +21,7 @@ class BaseReportFormatter[ReportT: BaseReport]:
         self._report = report
 
     def formatted_lines(self) -> Iterable[str]:
-        raise NotImplementedError()
+        return ()
 
     def format_report(self, file: TextIO) -> None:
         file.writelines(line + "\n" for line in self.formatted_lines())
@@ -178,8 +177,8 @@ class PolicyModuleReportFormatter(BaseReportFormatter[PolicyModuleReport]):
     @property
     def _effective_message(self) -> str | None:
         return (
-            "This policy module comparison has been made between modules at the highest available priority "
-            "to get the effective differences between actual and distribution policies."
+            "This policy module comparison has been made between modules at the highest available "
+            "priority to get the effective differences between actual and distribution policies."
             if self._report.effective
             else None
         )

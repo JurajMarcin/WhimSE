@@ -57,5 +57,5 @@ class PolicyExplorer[PolicyT: Policy]:
         _logger.debug("Checking disable dontaudit state in %r", self.policy_store)
         return (self.policy_store / "disable_dontaudit").is_file()
 
-    def get_policy(self) -> PolicyT:
+    def get_policy(self) -> "PolicyT":
         raise NotImplementedError()

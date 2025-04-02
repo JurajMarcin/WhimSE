@@ -957,7 +957,11 @@ class CilTyperule(BaseModel, CilNodeBase):
 
     def cil(self, indent: int = 0) -> Iterable[tuple[str, int]]:
         name_str = f' "{self.name}"' if self.name is not None else ""
-        yield f"({self.flavor} {self.source} {self.target} {self.cls}{name_str} {self.result})", indent
+        yield (
+            f"({self.flavor} {self.source} {self.target} "
+            f"{self.cls}{name_str} {self.result})",
+            indent,
+        )
 
 
 class CilTypepermissive(BaseModel, CilNodeBase):

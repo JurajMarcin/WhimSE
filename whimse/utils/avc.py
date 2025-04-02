@@ -1,9 +1,10 @@
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime
-from whimse.types.local_modifications import SecurityContext
 
 import auparse
+
+from whimse.types.local_modifications import SecurityContext
 
 
 @dataclass(frozen=True, kw_only=True)

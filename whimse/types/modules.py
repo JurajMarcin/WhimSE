@@ -51,7 +51,7 @@ class PolicyModuleSource:
     source_package: Package
     fetch_package: Package | None = None
 
-    def with_fetch_package(self, fetch_package: Package) -> "PolicyModuleSource":
+    def with_fetch_package(self, fetch_package: Package | None) -> "PolicyModuleSource":
         return PolicyModuleSource(
             self.install_method, self.source_package, fetch_package
         )

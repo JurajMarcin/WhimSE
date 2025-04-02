@@ -27,7 +27,10 @@ class _BaseHTMLReportFormatter:
 
     @property
     def _deleted_icon(self) -> str:
-        return '<span class="material-symbols-outlined inline-icon red">indeterminate_check_box</span>'
+        return (
+            '<span class="material-symbols-outlined inline-icon red">'
+            "indeterminate_check_box</span>"
+        )
 
 
 class HTMLLocalModificationsReportFormatter(

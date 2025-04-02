@@ -3,7 +3,7 @@ from logging import getLogger
 from typing import cast
 
 from setools.exception import InvalidType
-from setools.policyrep import AVRule, SELinuxPolicy
+from setools.policyrep import SELinuxPolicy
 
 from whimse.config import Config
 from whimse.report.analysis.common import Analysis
@@ -80,7 +80,10 @@ class AVCMatcher:
         )
 
     def __str__(self) -> str:
-        return f"<{self.__class__.__name__} avc={self._avc} stypes={self._stypes} ttypes={self._ttypes}>"
+        return (
+            f"<{self.__class__.__name__} avc={self._avc} stypes={self._stypes} "
+            f"ttypes={self._ttypes}>"
+        )
 
     def __repr__(self) -> str:
         return str(self)
@@ -89,12 +92,10 @@ class AVCMatcher:
 class AVRuleAVCMatcher(AVCMatcher):
     def _statement_filter(self, node: CilNode) -> bool:
         return (
-            (
-                (self._avc.denied and (node.flavor == "allow" or node.flavor == "deny"))
-                or (
-                    not self._avc.denied
-                    and (node.flavor == "auditallow" or node.flavor == "dontaudit")
-                )
+            isinstance(node, CilAvrule)
+            and (
+                (self._avc.denied and node.flavor in ("allow", "deny"))
+                or (not self._avc.denied and node.flavor in ("auditallow", "dontaudit"))
             )
             and node.source in self._stypes
             and node.target in self._ttypes
@@ -177,7 +178,8 @@ class AVCAnalysis(Analysis[Report]):
             section = AnalysisResultSection("Possibly Caused AVC")
             section.add_item(avc.text, True)
             section.add_item(
-                "The mentioned AVC denial could be possibly caused by the following policy modifications"
+                "The mentioned AVC denial could be possibly caused by "
+                "the following policy modifications"
             )
             for matcher in matchers:
                 for policy_module_report in report.policy_modules:
@@ -189,7 +191,7 @@ class AVCAnalysis(Analysis[Report]):
                         policy_module_report.dist_module,
                         matcher,
                     )
-                    for cil_node, diff, diff_node in matcher.get_related_diffs(
+                    for cil_node, diff, _ in matcher.get_related_diffs(
                         policy_module_report.diff
                     ):
                         _logger.info(
@@ -202,8 +204,15 @@ class AVCAnalysis(Analysis[Report]):
                             f"of the following {diff.node.flavor} statement "
                             f"on line {diff.node.line} "
                             f"in policy module {policy_module_report.module_name} "
-                            f"with priority {policy_module_report.actual_module.priority if policy_module_report.actual_module else None}"
-                            f"/{policy_module_report.dist_module.module.priority if policy_module_report.dist_module else None}"
+                            f"with priority {
+                                policy_module_report.actual_module.priority
+                                if policy_module_report.actual_module
+                                else None
+                            }/{
+                                policy_module_report.dist_module.module.priority
+                                if policy_module_report.dist_module
+                                else None
+                            }"
                         )
                         section.add_item(cil_node.cil_str(), True)
             if cause_found:

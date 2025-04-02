@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from logging import getLogger
 from pathlib import Path
 
-from rpm import (  # pylint: disable=no-name-in-module
+from rpm import (
     RPMDBI_INSTFILENAMES,  # pyright: ignore[reportAttributeAccessIssue]
     RPMFILE_GHOST,  # pyright: ignore[reportAttributeAccessIssue]
     RPMTAG_EVR,  # pyright: ignore[reportAttributeAccessIssue]

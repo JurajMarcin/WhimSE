@@ -130,7 +130,10 @@ class FileContext(LocalModificationStatement):
     context: SecurityContext | None
 
     def __str__(self) -> str:
-        return f"{self.pathname_regexp} {self.file_type} {self.context if self.context else '<<none>>'}"
+        return (
+            f"{self.pathname_regexp} {self.file_type} "
+            f"{self.context if self.context else '<<none>>'}"
+        )
 
     @staticmethod
     def parse(string: str) -> "FileContext":

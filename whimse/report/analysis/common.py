@@ -9,6 +9,6 @@ class Analysis[ReportT: BaseReport]:
         self._config = config
         self._policy = policy
 
-    def analyze(self, report: ReportT) -> AnalysisResult:
+    def analyze(self, report: "ReportT") -> AnalysisResult:
         del report
         raise NotImplementedError()
