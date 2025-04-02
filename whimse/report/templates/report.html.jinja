@@ -152,9 +152,9 @@
                 <p>{{ module_source_message }}</p>
                 {% endfor %}
                 <p>
-                    Actual policy module files:
+                    Active policy module files:
                     <ul>
-                        {% for file in policy_module_report._actual_module_files %}
+                        {% for file in policy_module_report._active_module_files %}
                             <li>{{ file }}</li>
                         {% endfor %}
                     </ul>

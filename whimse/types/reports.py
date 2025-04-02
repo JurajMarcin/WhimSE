@@ -59,7 +59,7 @@ class ChangeType(StrEnum):
 
 @dataclass()
 class DisableDontauditReport(BaseReport):
-    actual_value: bool
+    active_value: bool
     dist_value: bool
 
 
@@ -85,7 +85,7 @@ class PolicyModuleReportFlag(StrEnum):
 
 @dataclass()
 class PolicyModuleReport(BaseReport):
-    actual_module: PolicyModule | None
+    active_module: PolicyModule | None
     dist_module: DistPolicyModule | None
     effective: bool = False
     flags: set[PolicyModuleReportFlag] = field(default_factory=set)
@@ -94,11 +94,18 @@ class PolicyModuleReport(BaseReport):
 
     @property
     def module_name(self) -> str:
-        if self.actual_module:
-            return self.actual_module.name
+        if self.active_module:
+            return self.active_module.name
         if self.dist_module:
             return self.dist_module.module.name
-        assert False, "At least actual or dist module must be not None"
+        return ""
+
+    @property
+    def module_priority(self) -> tuple[int | None, int | None]:
+        return (
+            self.active_module.priority if self.active_module else None,
+            self.dist_module.module.priority if self.dist_module else None,
+        )
 
 
 class Report(BaseModel, BaseReport):

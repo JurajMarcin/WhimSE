@@ -17,7 +17,7 @@ class PlainDisableDontauditReportFormatter(DisableDontauditReportFormatter):
     def formatted_lines(self) -> Iterable[str]:
         if (
             not self._config.full_report
-            and self._report.actual_value == self._report.dist_value
+            and self._report.active_value == self._report.dist_value
         ):
             return
         yield f"{self._title}"
@@ -43,8 +43,8 @@ class PlainPolicyModuleReportFormatter(PolicyModuleReportFormatter):
         yield self._title
         for module_source_message in self._module_source_messages:
             yield _indent(module_source_message, 1)
-        yield _indent("Actual policy module files:", 1)
-        yield from (_indent(file, 2) for file in self._actual_module_files)
+        yield _indent("Active policy module files:", 1)
+        yield from (_indent(file, 2) for file in self._active_module_files)
         yield _indent("Source policy module files:", 1)
         yield from (_indent(file, 2) for file in self._dist_module_files)
         if eff_msg := self._effective_message:

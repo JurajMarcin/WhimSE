@@ -6,8 +6,8 @@ from pathlib import Path
 
 from whimse.config import Config, ModuleFetchMethod
 from whimse.explore.common import ExploreStageError, PolicyExplorer
-from whimse.explore.distributed.pm import package_manager_factory
-from whimse.explore.distributed.pm.common import FetchPackageError
+from whimse.explore.distribution.pm import package_manager_factory
+from whimse.explore.distribution.pm.common import FetchPackageError
 from whimse.types.local_modifications import LocalModifications
 from whimse.types.modules import (
     DistPolicyModule,

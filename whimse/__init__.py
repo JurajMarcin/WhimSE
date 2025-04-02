@@ -4,7 +4,7 @@ from sys import stderr
 
 from whimse.config import Config
 from whimse.detect import PolicyChangesDetector
-from whimse.explore import explore_stage
+from whimse.explore import explore_policy
 from whimse.report import report_formatter_factory
 from whimse.report.analysis import AnalysisRunner
 from whimse.report.json import JSONReportFormattter
@@ -24,9 +24,9 @@ def main() -> None:
         if config.input:
             report = JSONReportFormattter.load_report(config.input)
         else:
-            actual_policy, dist_policy = explore_stage(config)
+            active_policy, dist_policy = explore_policy(config)
             report = PolicyChangesDetector(
-                config, actual_policy, dist_policy
+                config, active_policy, dist_policy
             ).get_report()
             AnalysisRunner(config).run_analyses(report)
         report_formatter = report_formatter_factory(config, report)

@@ -1,8 +1,8 @@
 from logging import getLogger
 
 from whimse.config import Config
-from whimse.explore.distributed.pm.common import PackageManager
-from whimse.explore.distributed.pm.dnf import DNFPackageManager
+from whimse.explore.distribution.pm.common import PackageManager
+from whimse.explore.distribution.pm.dnf import DNFPackageManager
 
 _logger = getLogger(__name__)
 

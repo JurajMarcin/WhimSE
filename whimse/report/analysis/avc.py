@@ -187,7 +187,7 @@ class AVCAnalysis(Analysis[Report]):
                         continue
                     _logger.debug(
                         "Searching report for module %r/%r with matcher %r",
-                        policy_module_report.actual_module,
+                        policy_module_report.active_module,
                         policy_module_report.dist_module,
                         matcher,
                     )
@@ -204,15 +204,8 @@ class AVCAnalysis(Analysis[Report]):
                             f"of the following {diff.node.flavor} statement "
                             f"on line {diff.node.line} "
                             f"in policy module {policy_module_report.module_name} "
-                            f"with priority {
-                                policy_module_report.actual_module.priority
-                                if policy_module_report.actual_module
-                                else None
-                            }/{
-                                policy_module_report.dist_module.module.priority
-                                if policy_module_report.dist_module
-                                else None
-                            }"
+                            f"at priority {policy_module_report.module_priority[0]}"
+                            f"/{policy_module_report.module_priority[1]}"
                         )
                         section.add_item(cil_node.cil_str(), True)
             if cause_found:

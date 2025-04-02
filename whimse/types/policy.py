@@ -12,7 +12,7 @@ class Policy:
 
 
 @dataclass(frozen=True)
-class ActualPolicy(Policy):
+class ActivePolicy(Policy):
     modules: frozenset[PolicyModule]
 
 

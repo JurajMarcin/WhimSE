@@ -1,15 +1,15 @@
 from logging import getLogger
 
 from whimse.config import Config
-from whimse.explore.actual import ActualPolicyExplorer
-from whimse.explore.distributed import DistPolicyExplorer
-from whimse.types.policy import ActualPolicy, DistPolicy
+from whimse.explore.active import ActivePolicyExplorer
+from whimse.explore.distribution import DistPolicyExplorer
+from whimse.types.policy import ActivePolicy, DistPolicy
 
 _logger = getLogger(__name__)
 
 
-def explore_stage(config: Config) -> tuple[ActualPolicy, DistPolicy]:
+def explore_policy(config: Config) -> tuple[ActivePolicy, DistPolicy]:
     _logger.info("Exploring the current policy")
-    actual_policy = ActualPolicyExplorer(config).get_policy()
+    active_policy = ActivePolicyExplorer(config).get_policy()
     dist_policy = DistPolicyExplorer(config).get_policy()
-    return actual_policy, dist_policy
+    return active_policy, dist_policy

@@ -20,7 +20,7 @@ from rpm import (
 )
 
 from whimse.config import Config
-from whimse.explore.distributed.pm.common import FetchPackageError, PackageManager
+from whimse.explore.distribution.pm.common import FetchPackageError, PackageManager
 from whimse.types.modules import (
     DistPolicyModule,
     Package,
@@ -85,7 +85,7 @@ class DNFPackageManager(PackageManager):
                     # the module is installed later from one of the provided
                     # module files
                     _logger.debug(
-                        "Found ghost module %r with priority %r in package %r",
+                        "Found ghost module %r at priority %r in package %r",
                         name,
                         priority,
                         package,
@@ -150,7 +150,7 @@ class DNFPackageManager(PackageManager):
         )
         for install_file, install_priority in list_semodule_installs(post_install):
             _logger.debug(
-                "Found install of %r as policy module with priority %r in package %r",
+                "Found install of %r as policy module at priority %r in package %r",
                 install_file,
                 install_priority,
                 package,
@@ -179,7 +179,7 @@ class DNFPackageManager(PackageManager):
             if name in package_modules.ghost:
                 if install_priority not in package_modules.ghost[name]:
                     _logger.warning(
-                        "File %r installed with package %r is installed with different priority "
+                        "File %r installed with package %r is installed at different priority "
                         "than in ghosted module",
                         install_file,
                         package.full_name,

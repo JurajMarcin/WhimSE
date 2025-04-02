@@ -69,7 +69,7 @@ class Config:
         return (
             self.work_dir
             / "cilcache"
-            / ("actual" if not dist else "dist")
+            / ("active" if not dist else "dist")
             / Path(path).relative_to("/")
         )
 

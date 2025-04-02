@@ -13,6 +13,7 @@ from whimse.types.reports import (
     PolicyModuleReportFlag,
     Report,
 )
+from whimse.utils import either
 
 
 class BaseReportFormatter[ReportT: BaseReport]:
@@ -46,7 +47,7 @@ class DisableDontauditReportFormatter(BaseReportFormatter[DisableDontauditReport
     def _shown(self) -> bool:
         return (
             self._config.full_report
-            or self._report.actual_value != self._report.dist_value
+            or self._report.active_value != self._report.dist_value
         )
 
     @property
@@ -57,10 +58,10 @@ class DisableDontauditReportFormatter(BaseReportFormatter[DisableDontauditReport
 
     @property
     def _message(self) -> str:
-        if self._report.actual_value != self._report.dist_value:
+        if self._report.active_value != self._report.dist_value:
             return (
                 f"Disable dontaudit settings do not match "
-                f"actual=dontaudit {self._setting_str[self._report.actual_value]} "
+                f"active=dontaudit {self._setting_str[self._report.active_value]} "
                 f"distribution=dontaudit {self._setting_str[self._report.dist_value]}."
             )
         return "Disable dontaudit setting is unchanged."
@@ -111,17 +112,8 @@ class PolicyModuleReportFormatter(BaseReportFormatter[PolicyModuleReport]):
     @property
     def _id(self) -> str:
         return (
-            (
-                f"{self._report.actual_module.name}@{self._report.actual_module.priority}"
-                if self._report.actual_module
-                else "None"
-            )
-            + "-"
-            + (
-                f"{self._report.dist_module.module.name}@{self._report.dist_module.module.priority}"
-                if self._report.dist_module
-                else "None"
-            )
+            f"{self._report.module_name}"
+            f"@{self._report.module_priority[0]}-{self._report.module_priority[1]}"
         )
 
     @property
@@ -138,20 +130,10 @@ class PolicyModuleReportFormatter(BaseReportFormatter[PolicyModuleReport]):
 
     @property
     def _title(self) -> str:
-        title = f"{self._change_type_icon}{self._report.module_name}"
-        if self._report.actual_module and (
-            not self._report.dist_module
-            or self._report.actual_module.priority
-            == self._report.dist_module.module.priority
-        ):
-            return f"{title} at priority {self._report.actual_module.priority}"
-        if not self._report.actual_module and self._report.dist_module:
-            return f"{title} at priority {self._report.dist_module.module.priority}"
-        assert self._report.actual_module and self._report.dist_module
-        return (
-            f"{title} at actual priority {self._report.actual_module.priority} "
-            f"vs at distribution priority {self._report.dist_module.module.priority}"
-        )
+        title = f"{self._change_type_icon}{self._report.module_name} at "
+        if self._report.module_priority[0] == self._report.module_priority[1]:
+            return f"{title} {either(self._report.module_priority)}"
+        return f"{title} {self._report.module_priority[0]}/{self._report.module_priority[1]}"
 
     @property
     def _module_source_messages(self) -> Iterable[str]:
@@ -163,10 +145,10 @@ class PolicyModuleReportFormatter(BaseReportFormatter[PolicyModuleReport]):
             yield f"Fetched package: {self._report.dist_module.source.fetch_package}"
 
     @property
-    def _actual_module_files(self) -> Iterable[str]:
-        if not self._report.actual_module:
+    def _active_module_files(self) -> Iterable[str]:
+        if not self._report.active_module:
             return ()
-        return (file for _, file in self._report.actual_module.files)
+        return (file for _, file in self._report.active_module.files)
 
     @property
     def _dist_module_files(self) -> Iterable[str]:
@@ -178,7 +160,7 @@ class PolicyModuleReportFormatter(BaseReportFormatter[PolicyModuleReport]):
     def _effective_message(self) -> str | None:
         return (
             "This policy module comparison has been made between modules at the highest available "
-            "priority to get the effective differences between actual and distribution policies."
+            "priority to get the effective differences between active and distribution policies."
             if self._report.effective
             else None
         )
@@ -243,7 +225,7 @@ class PolicyModuleReportFormatter(BaseReportFormatter[PolicyModuleReport]):
         if diff_node.left.flavor:
             node_message = (
                 f" in {diff_node.left.flavor} statement "
-                f"on line {diff_node.left.line} (actual) / {diff_node.right.line} (distribution)."
+                f"on line {diff_node.left.line} (active) / {diff_node.right.line} (distribution)."
             )
         return (
             f"{self._diff_side_icon(diff)} {diff.node.flavor} statement "
@@ -268,9 +250,5 @@ class ReportFormatter(BaseReportFormatter[Report]):
     def _policy_module_reports(self) -> list[PolicyModuleReport]:
         return sorted(
             self._report.policy_modules,
-            key=lambda pmr: (
-                pmr.module_name,
-                pmr.actual_module.priority if pmr.actual_module else -1,
-                pmr.dist_module.module.priority if pmr.dist_module else -1,
-            ),
+            key=lambda pmr: (pmr.module_name, *pmr.module_priority),
         )

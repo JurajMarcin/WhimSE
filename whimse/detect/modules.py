@@ -40,7 +40,7 @@ class ModuleComparissonException(Exception):
 
 @dataclass()
 class _PolicyModulePair:
-    actual_module: PolicyModule | None = None
+    active_module: PolicyModule | None = None
     dist_module: DistPolicyModule | None = None
     effective_pair: bool = False
 
@@ -48,23 +48,23 @@ class _PolicyModulePair:
 class PolicyModulesChangeDetector(ChangesDetector):
     def _get_module_pairs(self) -> Iterable[_PolicyModulePair]:
         highest_modules: dict[str, _PolicyModulePair] = {}
-        actual_modules_per_prio: dict[int, dict[str, PolicyModule]] = {}
+        active_modules_per_prio: dict[int, dict[str, PolicyModule]] = {}
         dist_modules_per_prio: dict[int, dict[str, DistPolicyModule]] = {}
 
-        for actual_module in self._actual_policy.modules:
-            actual_modules_per_prio.setdefault(actual_module.priority, {})[
-                actual_module.name
-            ] = actual_module
-            if actual_module.disabled:
+        for active_module in self._active_policy.modules:
+            active_modules_per_prio.setdefault(active_module.priority, {})[
+                active_module.name
+            ] = active_module
+            if active_module.disabled:
                 continue
             highest_pair = highest_modules.setdefault(
-                actual_module.name, _PolicyModulePair(effective_pair=True)
+                active_module.name, _PolicyModulePair(effective_pair=True)
             )
             if (
-                highest_pair.actual_module is None
-                or highest_pair.actual_module.priority < actual_module.priority
+                highest_pair.active_module is None
+                or highest_pair.active_module.priority < active_module.priority
             ):
-                highest_pair.actual_module = actual_module
+                highest_pair.active_module = active_module
         for dist_module in self._dist_policy.modules:
             if dist_module.module.disabled:
                 continue
@@ -82,23 +82,23 @@ class PolicyModulesChangeDetector(ChangesDetector):
                 highest_pair.dist_module = dist_module
 
         for priority in sorted(
-            set(chain(actual_modules_per_prio.keys(), dist_modules_per_prio.keys()))
+            set(chain(active_modules_per_prio.keys(), dist_modules_per_prio.keys()))
         ):
-            for actual_module in actual_modules_per_prio.get(priority, {}).values():
-                dist_module = dist_modules_per_prio.get(actual_module.priority, {}).pop(
-                    actual_module.name, None
+            for active_module in active_modules_per_prio.get(priority, {}).values():
+                dist_module = dist_modules_per_prio.get(active_module.priority, {}).pop(
+                    active_module.name, None
                 )
                 yield _PolicyModulePair(
-                    actual_module=actual_module,
+                    active_module=active_module,
                     dist_module=dist_module,
                 )
             for dist_module in dist_modules_per_prio.get(priority, {}).values():
                 yield _PolicyModulePair(dist_module=dist_module)
         for highest_pair in highest_modules.values():
             if (
-                highest_pair.actual_module
+                highest_pair.active_module
                 and highest_pair.dist_module
-                and highest_pair.actual_module.priority
+                and highest_pair.active_module.priority
                 != highest_pair.dist_module.module.priority
             ):
                 yield highest_pair
@@ -132,10 +132,10 @@ class PolicyModulesChangeDetector(ChangesDetector):
     def _compare_pair(self, pair: _PolicyModulePair) -> PolicyModuleReport:
         _logger.debug("Detecting changes in policy module %r", pair)
         report = PolicyModuleReport(
-            actual_module=pair.actual_module, dist_module=pair.dist_module
+            active_module=pair.active_module, dist_module=pair.dist_module
         )
         if (
-            pair.actual_module is None
+            pair.active_module is None
             and pair.dist_module is not None
             and pair.dist_module.source.install_method
             == PolicyModuleInstallMethod.UNKNOWN
@@ -152,7 +152,7 @@ class PolicyModulesChangeDetector(ChangesDetector):
         ):
             # Dist module with ghost files
             report.flags.add(PolicyModuleReportFlag.GENERATED)
-            if not pair.actual_module:
+            if not pair.active_module:
                 report.change_type = ChangeType.DELETION
             return report
         if pair.dist_module is not None:
@@ -164,24 +164,24 @@ class PolicyModulesChangeDetector(ChangesDetector):
             ):
                 report.flags.add(PolicyModuleReportFlag.USING_NEWER_POLICY)
         if (
-            pair.actual_module is not None
+            pair.active_module is not None
             and pair.dist_module is not None
             and pair.dist_module.source.install_method
             == PolicyModuleInstallMethod.UNKNOWN
             and len(pair.dist_module.module.files) > 0
         ):
             report.flags.add(PolicyModuleReportFlag.UNKNOWN_INSTALL_METHOD)
-        assert (pair.actual_module is None or len(pair.actual_module.files) > 0) and (
+        assert (pair.active_module is None or len(pair.active_module.files) > 0) and (
             pair.dist_module is None or len(pair.dist_module.module.files) > 0
         )
-        actual_path = self._get_cil_file_path(pair.actual_module, False)
+        active_path = self._get_cil_file_path(pair.active_module, False)
         dist_path = self._get_cil_file_path(
             pair.dist_module.module if pair.dist_module else None, True
         )
-        report.diff = cildiff(self._config, actual_path, dist_path)
+        report.diff = cildiff(self._config, active_path, dist_path)
         report.effective = pair.effective_pair
 
-        if pair.actual_module is None:
+        if pair.active_module is None:
             report.change_type = ChangeType.DELETION
         elif pair.dist_module is None:
             report.change_type = ChangeType.ADDITION
