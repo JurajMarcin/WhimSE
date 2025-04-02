@@ -11,7 +11,9 @@ else
 override CFLAGS += -Werror
 endif
 
-override CFLAGS += -std=c11 -pedantic -Wall -Wextra -D_GNU_SOURCE
+VERSION ?= $(shell env -C ../../ python3 -c import\ whimse\;\ print\(whimse.__version__\))
+
+override CFLAGS += -std=c11 -pedantic -Wall -Wextra -D_GNU_SOURCE -DVERSION='"$(VERSION)"'
 
 override CFLAGS += \
 	-I "../selinux/libsepol/include/" \

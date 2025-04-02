@@ -9,7 +9,7 @@ from whimse.report import report_formatter_factory
 from whimse.report.analysis import AnalysisRunner
 from whimse.report.json import JSONReportFormattter
 
-__version__ = "1.0"
+__version__ = "0.1"
 
 
 def main() -> None:

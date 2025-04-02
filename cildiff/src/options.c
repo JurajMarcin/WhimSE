@@ -5,6 +5,10 @@
 #include <stdio.h>
 #include <string.h>
 
+#ifndef VERSION
+#error "VERSION macro is not defined"
+#endif
+
 
 static void print_usage(const char *progname)
 {
@@ -20,6 +24,10 @@ static void print_help(const char *progname)
            "    %s [OPTIONS] LEFT RIGHT\n"
            "\n"
            "OPTIONS\n"
+           "    -h, --help\n"
+           "        show this help\n"
+           "    -V, --version\n"
+           "        show version\n"
            "    --json[=pretty]\n"
            "        format output in JSON instead of CIL with plain text comments,\n"
            "        optionally with pretty formatting\n"
@@ -32,6 +40,7 @@ static void print_help(const char *progname)
 
 static const struct option opts[] = {
     { "help", no_argument, NULL, 'h' },
+    { "version", no_argument, NULL, 'V' },
     { "json", optional_argument, NULL, 'j' },
     { NULL, 0, NULL, 0},
 };
@@ -40,10 +49,13 @@ int parse_options(int argc, char *argv[], struct options *options)
 {
     struct options tmp_options = {0};
     int opt;
-    while ((opt = getopt_long(argc, argv, "h", opts, NULL)) != -1) {
+    while ((opt = getopt_long(argc, argv, "hV", opts, NULL)) != -1) {
         switch (opt) {
         case 'h':
             print_help(argv[0]);
+            return 1;
+        case 'V':
+            printf("%s", VERSION);
             return 1;
         case 'j':
             tmp_options.json = true;
