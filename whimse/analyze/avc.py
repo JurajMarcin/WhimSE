@@ -5,8 +5,8 @@ from typing import cast
 from setools.exception import InvalidType
 from setools.policyrep import SELinuxPolicy
 
+from whimse.analyze.common import Analysis
 from whimse.config import Config
-from whimse.report.analysis.common import Analysis
 from whimse.types.cildiff import (
     CilAvrule,
     CilClassperms,

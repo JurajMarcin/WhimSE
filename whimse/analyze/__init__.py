@@ -2,9 +2,9 @@ from logging import getLogger
 
 from setools.policyrep import SELinuxPolicy
 
+from whimse.analyze.avc import AVCAnalysis
+from whimse.analyze.common import Analysis
 from whimse.config import Config
-from whimse.report.analysis.avc import AVCAnalysis
-from whimse.report.analysis.common import Analysis
 from whimse.types.reports import Report
 
 _logger = getLogger(__name__)

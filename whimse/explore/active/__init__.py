@@ -17,7 +17,8 @@ class ActivePolicyExplorer(PolicyExplorer[ActivePolicy]):
 
     def _get_policy_modules(self) -> Iterable[PolicyModule]:
         _logger.debug(
-            "Gathering modules from the active policy from %r", self.policy_store
+            "Exploring policy modules in the active policy contained in %r",
+            self.policy_store,
         )
         modules_path = self.policy_store / "active" / "modules"
         disabled_path = modules_path / "disabled"
@@ -50,7 +51,7 @@ class ActivePolicyExplorer(PolicyExplorer[ActivePolicy]):
                 )
 
     def get_policy(self) -> ActivePolicy:
-        _logger.info("Gathering facts about the active policy")
+        _logger.info("Exploring the active policy")
         return ActivePolicy(
             self.get_local_modifications(),
             self.get_disable_dontaudit_state(),

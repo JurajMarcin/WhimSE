@@ -132,7 +132,7 @@ class DistPolicyExplorer(PolicyExplorer[DistPolicy]):
         return self._fetch_dist_modules(self._package_manager.find_selinux_modules())
 
     def get_policy(self) -> DistPolicy:
-        _logger.info("Gathering facts about the distribution policy")
+        _logger.info("Exploring the distribution policy")
         _logger.debug(
             "Fetching the local modification files and the disable_dontaudit status"
         )

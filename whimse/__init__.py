@@ -2,11 +2,11 @@ from logging import basicConfig, getLogger
 from shutil import rmtree
 from sys import stderr
 
+from whimse.analyze import AnalysisRunner
 from whimse.config import Config
 from whimse.detect import PolicyChangesDetector
 from whimse.explore import explore_policy
 from whimse.report import report_formatter_factory
-from whimse.report.analysis import AnalysisRunner
 from whimse.report.json import JSONReportFormattter
 
 __version__ = "0.1"

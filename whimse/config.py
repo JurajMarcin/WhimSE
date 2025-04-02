@@ -161,7 +161,7 @@ class Config:
             "local - trust a second local copy of the policy module, source of 'semodule -i',\n"
             "exact - fetch policy module from a package with the same version as installed,\n"
             "newer - fetch policy module from a package with newer version.\n"
-            "Default: local,exact,newer.",
+            "Default: exact,local,newer.",
         )
         policy_explore_options.add_argument(
             "--policy-updates",
@@ -232,8 +232,8 @@ class Config:
                 tuple(parsed_args.module_fetch)
                 if parsed_args.module_fetch
                 else (
-                    ModuleFetchMethod.LOCAL_MODULE,
                     ModuleFetchMethod.EXACT_PACKAGE,
+                    ModuleFetchMethod.LOCAL_MODULE,
                     ModuleFetchMethod.NEWER_PACKAGE,
                 )
             ),
