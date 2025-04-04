@@ -36,8 +36,7 @@ class _BaseHTMLReportFormatter:
 class HTMLLocalModificationsReportFormatter(
     LocalModificationsReportFormatter, _BaseHTMLReportFormatter
 ):
-
-    def _change_message(self, change: LocalModificationsChange) -> str:
+    def _change_icon(self, change: LocalModificationsChange) -> str:
         match change.change_type:
             case ChangeType.ADDITION:
                 return self._added_icon
@@ -45,6 +44,10 @@ class HTMLLocalModificationsReportFormatter(
                 return self._deleted_icon
             case ChangeType.MODIFICATION:
                 return self._modified_icon
+
+    def _change_message(self, change: LocalModificationsChange) -> str:
+        del change
+        return ""
 
 
 class HTMLPolicyModuleReportFormatter(

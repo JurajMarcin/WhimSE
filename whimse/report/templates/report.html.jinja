@@ -86,7 +86,7 @@
                     {% if local_modifications_report._shown %}
                     <li>
                         <a href="#local_modifications_report_{{ local_modifications_report._report.section }}">
-                            {{ local_modifications_report._title }}
+                            {{ local_modifications_report._title|e }}
                         </a>
                     </li>
                     {% endif %}
@@ -100,7 +100,8 @@
                     {% if policy_module_report._shown %}
                     <li>
                         <a href="#policy_module_report_{{ policy_module_report._id }}">
-                            {{ policy_module_report._title }}
+                            {{ policy_module_report._change_type_icon }}
+                            {{ policy_module_report._title|e }}
                         </a>
                     </li>
                     {% endif %}
@@ -116,8 +117,8 @@
         <h1>What Have I Modified in SELinux</h1>
         {% if disable_dontaudit_report._shown %}
         <section id="disable_dontaudit">
-            <h2>{{ disable_dontaudit_report._title }}</h2>
-            <p>{{ disable_dontaudit_report._message }}</p>
+            <h2>{{ disable_dontaudit_report._title|e }}</h2>
+            <p>{{ disable_dontaudit_report._message|e }}</p>
         </section>
         {% endif %}
         <section id="local_modifications">
@@ -126,17 +127,18 @@
             {% if local_modifications_report._shown %}
             <section id="local_modifications_report_{{ local_modifications_report._report.section }}">
                 <h3>
-                    {{ local_modifications_report._title }}
+                    {{ local_modifications_report._title|e }}
                     {{ local_modifications_report._added_icon }}
-                    {{ local_modifications_report._change_count[0] }}
+                    {{ local_modifications_report._change_count[0]|e }}
                     {{ local_modifications_report._deleted_icon }}
-                    {{ local_modifications_report._change_count[1] }}
+                    {{ local_modifications_report._change_count[1]|e }}
                 </h3>
                 {% for change in local_modifications_report._report.changes %}
                 <p>
-                    {{ local_modifications_report._change_message(change) }}
-                <pre class="local-mod-statement">{{ change.statement|e }}</pre>
+                    {{ local_modifications_report._change_icon(change) }}
+                    {{ local_modifications_report._change_message(change)|e }}
                 </p>
+                <pre class="local-mod-statement">{{ change.statement|e }}</pre>
                 {% endfor %}
             </section>
             {% endif %}
@@ -147,15 +149,15 @@
             {% for policy_module_report in policy_module_reports %}
             {% if policy_module_report._shown %}
             <section id="policy_module_report_{{ policy_module_report._id }}">
-                <h3>{{ policy_module_report._title }}</h3>
+                <h3>{{ policy_module_report._title|e }}</h3>
                 {% for module_source_message in policy_module_report._module_source_messages %}
-                <p>{{ module_source_message }}</p>
+                <p>{{ module_source_message|e }}</p>
                 {% endfor %}
                 <p>
                     Active policy module files:
                     <ul>
                         {% for file in policy_module_report._active_module_files %}
-                            <li>{{ file }}</li>
+                            <li>{{ file|e }}</li>
                         {% endfor %}
                     </ul>
                 </p>
@@ -163,7 +165,7 @@
                     Distribution policy module files:
                     <ul>
                         {% for file in policy_module_report._dist_module_files %}
-                            <li>{{ file }}</li>
+                            <li>{{ file|e }}</li>
                         {% endfor %}
                     </ul>
                 </p>
@@ -172,7 +174,7 @@
                 {% endif %}
                 {% for flag_message in policy_module_report._flag_messages %}
                 <p>
-                    {{ flag_message }}
+                    {{ flag_message|e }}
                 </p>
                 {% endfor %}
                 {% if policy_module_report._report.diff and policy_module_report._report.diff.contains_changes %}
@@ -180,13 +182,16 @@
                     <h4>
                         Changes
                         {{ policy_module_report._added_icon }}
-                        {{ policy_module_report._change_count[0] }}
+                        {{ policy_module_report._change_count[0]|e }}
                         {{ policy_module_report._deleted_icon }}
-                        {{ policy_module_report._change_count[1] }}
+                        {{ policy_module_report._change_count[1]|e }}
                     </h4>
                     {% for diff, diff_node in policy_module_report._diffs() %}
                     <div class="diff">
-                        <p>{{ policy_module_report._diff_message(diff, diff_node) }}</p>
+                        <p>
+                            {{ policy_module_report._diff_side_icon(diff) }}
+                            {{ policy_module_report._diff_message(diff, diff_node)|e }}
+                        </p>
                         <pre class="cil">{{ diff.node.cil_str()|e }}</pre>
                     </div>
                     {% endfor %}
@@ -200,15 +205,15 @@
             <h2>Analysis Results</h2>
             {% for analysis_result in report.analysis_results %}
                 <section>
-                    <h3>{{ analysis_result.title }}</h3>
+                    <h3>{{ analysis_result.title|e }}</h3>
                     {% for analysis_result_section in analysis_result.sections %}
                     <section>
-                        <h4>{{ analysis_result_section.title }}</h4>
+                        <h4>{{ analysis_result_section.title|e }}</h4>
                         {% for analysis_result_item in analysis_result_section.items %}
                         {% if analysis_result_item.preformat %}
-                        <pre class="preformat">{{ analysis_result_item.text }}</pre>
+                        <pre class="preformat">{{ analysis_result_item.text|e }}</pre>
                         {% else %}
-                        <p>{{ analysis_result_item.text }}</p>
+                        <p>{{ analysis_result_item.text|e }}</p>
                         {% endif %}
                         {% endfor %}
                     </section>

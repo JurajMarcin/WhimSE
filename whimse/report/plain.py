@@ -31,7 +31,9 @@ class PlainLocalModificationsReportFormatter(LocalModificationsReportFormatter):
             return
         yield f"{self._title} (+{self._change_count[0]} -{self._change_count[1]})"
         for change in self._report.changes:
-            yield _indent(self._change_message(change), 1)
+            yield _indent(
+                f"{self._change_icon(change)}{self._change_message(change)}", 1
+            )
             yield _indent(change.statement, 2)
         yield ""
 
@@ -40,7 +42,7 @@ class PlainPolicyModuleReportFormatter(PolicyModuleReportFormatter):
     def formatted_lines(self) -> Iterable[str]:
         if not self._shown:
             return
-        yield self._title
+        yield f"{self._change_type_icon} {self._title}"
         for module_source_message in self._module_source_messages:
             yield _indent(module_source_message, 1)
         yield _indent("Active policy module files:", 1)
@@ -52,7 +54,9 @@ class PlainPolicyModuleReportFormatter(PolicyModuleReportFormatter):
         yield from (_indent(flag_msg, 1) for flag_msg in self._flag_messages)
         yield _indent(f"Changes (+{self._change_count[0]} -{self._change_count[1]})", 1)
         for diff, diff_node in self._diffs():
-            yield _indent(self._diff_message(diff, diff_node), 1)
+            yield _indent(
+                f"{self._diff_side_icon(diff)} {self._diff_message(diff, diff_node)}", 1
+            )
             if diff.description:
                 yield _indent(diff.description, 2)
             yield from (

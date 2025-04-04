@@ -88,6 +88,10 @@ class LocalModificationsReportFormatter(BaseReportFormatter[LocalModificationsRe
     def _title(self) -> str:
         return f"{self._report.section}"
 
+    def _change_icon(self, change: LocalModificationsChange) -> str:
+        del change
+        return ""
+
     def _change_message(self, change: LocalModificationsChange) -> str:
         return f"{change.change_type.capitalize()}"
 
@@ -120,17 +124,17 @@ class PolicyModuleReportFormatter(BaseReportFormatter[PolicyModuleReport]):
     def _change_type_icon(self) -> str:
         match self._report.change_type:
             case ChangeType.ADDITION:
-                return "(+) "
+                return "(+)"
             case ChangeType.DELETION:
-                return "(-) "
+                return "(-)"
             case ChangeType.MODIFICATION:
-                return "(.) "
+                return "(.)"
             case None:
-                return ""
+                return "   "
 
     @property
     def _title(self) -> str:
-        title = f"{self._change_type_icon}{self._report.module_name} at "
+        title = f"{self._report.module_name} at "
         if self._report.module_priority[0] == self._report.module_priority[1]:
             return f"{title} {either(self._report.module_priority)}"
         return f"{title} {self._report.module_priority[0]}/{self._report.module_priority[1]}"
@@ -228,7 +232,7 @@ class PolicyModuleReportFormatter(BaseReportFormatter[PolicyModuleReport]):
                 f"on line {diff_node.left.line} (active) / {diff_node.right.line} (distribution)."
             )
         return (
-            f"{self._diff_side_icon(diff)} {diff.node.flavor} statement "
+            f"{diff.node.flavor} statement "
             f"on line {diff.node.line}{node_message}"
         )
 
@@ -250,5 +254,8 @@ class ReportFormatter(BaseReportFormatter[Report]):
     def _policy_module_reports(self) -> list[PolicyModuleReport]:
         return sorted(
             self._report.policy_modules,
-            key=lambda pmr: (pmr.module_name, *pmr.module_priority),
+            key=lambda pmr: (
+                pmr.module_name,
+                *(prio if prio else -1 for prio in pmr.module_priority),
+            ),
         )
