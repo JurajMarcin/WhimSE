@@ -21,7 +21,13 @@ whimse = "whimse:main"
 version = { attr = "whimse.__version__" }
 
 [tool.setuptools.packages.find]
-include = ["whimse"]
+include = [
+    "whimse",
+    "whimse.**",
+]
+
+[tool.setuptools.package-data]
+"whimse.report" = ["templates/*"]
 
 [tool.pylint.main]
 extension-pkg-allow-list = [
