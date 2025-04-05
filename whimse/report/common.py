@@ -1,4 +1,20 @@
+# Copyright (C) 2025 Juraj Marcin <juraj@jurajmarcin.com>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 from collections.abc import Iterable
+from logging import getLogger
 from typing import TextIO
 
 from whimse.config import Config
@@ -15,6 +31,8 @@ from whimse.types.reports import (
 )
 from whimse.utils import either
 
+_logger = getLogger(__name__)
+
 
 class BaseReportFormatter[ReportT: BaseReport]:
     def __init__(self, config: Config, report: "ReportT") -> None:
@@ -25,6 +43,7 @@ class BaseReportFormatter[ReportT: BaseReport]:
         return ()
 
     def format_report(self, file: TextIO) -> None:
+        _logger.debug("Formatting the report using formatted_lines from %r", self)
         file.writelines(line + "\n" for line in self.formatted_lines())
 
     def _count_changes(
@@ -232,8 +251,7 @@ class PolicyModuleReportFormatter(BaseReportFormatter[PolicyModuleReport]):
                 f"on line {diff_node.left.line} (active) / {diff_node.right.line} (distribution)."
             )
         return (
-            f"{diff.node.flavor} statement "
-            f"on line {diff.node.line}{node_message}"
+            f"{diff.node.flavor} statement " f"on line {diff.node.line}{node_message}"
         )
 
 

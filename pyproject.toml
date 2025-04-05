@@ -5,6 +5,13 @@ build-backend = "setuptools.build_meta"
 [project]
 dynamic = ["version"]
 name = "whimse"
+description = "What Have I Modified in SELinux"
+authors = [
+    { name = "Juraj Marcin", email = "juraj@jurajmarcin.com" },
+]
+readme = "README.md"
+license = { text = "GPL-3.0-or-later" }
+
 dependencies = [
     "jinja2 > 3",
     "pydantic > 2",

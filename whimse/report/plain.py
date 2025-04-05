@@ -1,5 +1,21 @@
+# Copyright (C) 2025 Juraj Marcin <juraj@jurajmarcin.com>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 from collections.abc import Iterable
-from typing import Any
+from logging import getLogger
+from typing import Any, TextIO
 
 from whimse.report.common import (
     DisableDontauditReportFormatter,
@@ -7,6 +23,8 @@ from whimse.report.common import (
     PolicyModuleReportFormatter,
     ReportFormatter,
 )
+
+_logger = getLogger(__name__)
 
 
 def _indent(string: str | Any, size: int) -> str:
@@ -103,3 +121,7 @@ class PlainReportFormatter(ReportFormatter):
                             _indent(line, 2)
                             for line in analysis_result_item.text.splitlines()
                         )
+
+    def format_report(self, file: TextIO) -> None:
+        _logger.info("Generating plain text report")
+        return super().format_report(file)
