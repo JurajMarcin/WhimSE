@@ -178,10 +178,14 @@ class AVCAnalysis(Analysis[Report]):
 
     def __init__(self, config: Config, policy: SELinuxPolicy) -> None:
         super().__init__(config, policy)
-        self._matchers = [
-            (avc, [matcher(avc, policy) for matcher in self._registered_matchers])
-            for avc in get_avc_events(config.avc_start_time)
-        ]
+        try:
+            self._matchers = [
+                (avc, [matcher(avc, policy) for matcher in self._registered_matchers])
+                for avc in get_avc_events(config.avc_start_time)
+            ]
+        except IOError as ex:
+            _logger.warning("Could not load audit log: %r", ex)
+            self._matchers = []
 
     def analyze(self, report: Report) -> AnalysisResult:
         _logger.info("Running AVC Analysis")
