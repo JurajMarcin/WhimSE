@@ -65,6 +65,7 @@ make
 
 **Runtime dependencies:**
 
+- `cpio`
 - `dnf`
 - `policycoreutils`
 - `python3-audit`

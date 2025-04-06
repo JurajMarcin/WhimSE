@@ -1,6 +1,6 @@
 Name:    whimse
 Version: 0.1
-Release: 5%{?dist}
+Release: 6%{?dist}
 Summary: What Have I Modified in SELinux
 
 License: GPL-3.0-or-later
@@ -10,6 +10,7 @@ Source:  %{url}/archive/v%{version}/whimse-%{version}.tar.gz
 BuildRequires: python3-devel
 
 Requires: cildiff%{?_isa} = %{version}-%{release}
+Requires: cpio
 Requires: dnf
 Requires: policycoreutils
 Requires: python3-audit
@@ -71,5 +72,8 @@ cildiff is a helper application that compares two CIL SELinux policies.
 
 
 %changelog
+* Sun Apr 06 2025 Juraj Marcin <juraj@jurajmarcin.com> - 0.1-6
+- Add missing cpio dependency
+
 * Sat Apr 05 2025 Juraj Marcin <juraj@jurajmarcin.com> - 0.1-5
 - Initial prerelase
