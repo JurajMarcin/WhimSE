@@ -19,6 +19,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field
 from logging import getLogger
 from pathlib import Path
+from subprocess import CalledProcessError
 
 from rpm import (
     RPMDBI_INSTFILENAMES,  # pyright: ignore[reportAttributeAccessIssue]
@@ -75,7 +76,7 @@ class DNFPackageManager(PackageManager):
             rf"^{re.escape(str(config.policy_store_path).rstrip('/'))}"
             rf"\/active\/modules\/(?P<priority>\d+)\/(?P<module_name>[^\/]+)$"
         )
-        self._rpms_cache_path = self._config.shadow_root_path / ".rpms"
+        self._rpms_cache_path = self._config.work_dir / "rpms"
 
     def _rpm_package_to_package(self, rpm_package) -> Package:
         return Package(
@@ -315,7 +316,7 @@ class DNFPackageManager(PackageManager):
                 if epoch_match := re.match(r"^(?P<epoch>\d+:)\d.*$", package.version):
                     return next(
                         self._rpms_cache_path.glob(
-                            f"{package.full_name.replace(epoch_match.group("epoch"), "", 1)}*.rpm"
+                            f"{package.full_name.replace(epoch_match.group('epoch'), '', 1)}*.rpm"
                         ),
                     )
         return next(self._rpms_cache_path.glob(f"{package.name}*.rpm"))
@@ -328,18 +329,20 @@ class DNFPackageManager(PackageManager):
         try:
             rpm_path = self._get_cached_rpm(package, exact_version)
         except StopIteration:
-            self._rpms_cache_path.mkdir(parents=True, exist_ok=True)
-            dnf_process = run(
-                ["dnf", "download", package_name],
-                cwd=self._rpms_cache_path,
-                check=False,
-                logger=_logger,
-            )
-            if dnf_process.returncode != 0:
+            try:
+                self._rpms_cache_path.mkdir(parents=True, exist_ok=True)
+                _logger.info("Downloading package %r", package_name)
+                run(
+                    ["dnf", "download", package_name],
+                    cwd=self._rpms_cache_path,
+                    check=True,
+                    logger=_logger,
+                )
+                rpm_path = self._get_cached_rpm(package, exact_version)
+            except (StopIteration, CalledProcessError) as ex:
                 raise FetchPackageError(
                     f"Could not fetch package {package_name}"
-                ) from None
-            rpm_path = self._get_cached_rpm(package, exact_version)
+                ) from ex
 
         with open(rpm_path, "rb") as rpm_handle:
             ts = rpm.TransactionSet(vsflags=RPMVSF_MASK_NOSIGNATURES)
@@ -350,6 +353,7 @@ class DNFPackageManager(PackageManager):
         _logger.debug(
             "Extracting files %r from package %r", files_list, package.full_name
         )
+        self._config.shadow_root_path.mkdir(parents=True, exist_ok=True)
         run(
             f"rpm2cpio {rpm_path} | cpio -imd {shlex.join(files_list)}",
             cwd=self._config.shadow_root_path,
