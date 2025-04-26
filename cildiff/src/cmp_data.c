@@ -77,16 +77,16 @@ DEFINE_DATA(decl_name, struct cil_aliasactual) \
     cmp_hash_update_string(full_hash, decl_name->actual_str); \
 }
 
-#define HASH_STR_OR_DATA(hash_state, flavor, str, data) \
-do { \
-    if ((str)) { \
-        cmp_hash_update_string((hash_state), (str)); \
-    } else { \
-        struct cmp_data cmp_data = {0}; \
-        cmp_data_init((flavor), (data), &cmp_data); \
-        cmp_hash_update((hash_state), HASH_SIZE, cmp_data.full_hash); \
-    } \
-} while (0)
+void hash_str_or_data(struct cmp_hash_state *hash_state, enum cil_flavor flavor, const char *str, const void *data)
+{
+    if (str) {
+        cmp_hash_update_string(hash_state, str);
+    } else {
+        struct cmp_data cmp_data = {0};
+        cmp_data_init(flavor, data, &cmp_data);
+        cmp_hash_update(hash_state, HASH_SIZE, cmp_data.full_hash);
+    }
+}
 
 static void hash_cil_expr(const struct cil_list *expr, char full_hash[HASH_SIZE])
 {
@@ -271,7 +271,7 @@ DEFINE_DATA(avrule, struct cil_avrule)
     cmp_hash_update_string(full_hash, avrule->tgt_str);
     *partial_hash = cmp_hash_copy(full_hash);
     if (avrule->is_extended) {
-        HASH_STR_OR_DATA(full_hash, CIL_PERMISSIONX, avrule->perms.x.permx_str, avrule->perms.x.permx);
+        hash_str_or_data(full_hash, CIL_PERMISSIONX, avrule->perms.x.permx_str, avrule->perms.x.permx);
     } else {
         // After building AST, avrule should have a single anonymous or named classpermissionset
         assert(avrule->perms.classperms->head == avrule->perms.classperms->tail);
@@ -500,7 +500,7 @@ DEFINE_DATA(context, struct cil_context)
     cmp_hash_update_string(full_hash, context->user_str);
     cmp_hash_update_string(full_hash, context->role_str);
     cmp_hash_update_string(full_hash, context->type_str);
-    HASH_STR_OR_DATA(full_hash, CIL_LEVELRANGE, context->range_str, context->range);
+    hash_str_or_data(full_hash, CIL_LEVELRANGE, context->range_str, context->range);
 }
 
 /******************************************************************************
@@ -516,22 +516,6 @@ DEFINE_DATA(cil_default, struct cil_default)
     hash_cil_string_list(cil_default->class_strs, LIST_ORDER_UNORDERED, class_hash);
     cmp_hash_update(full_hash, HASH_SIZE, class_hash);
 }
-// DEFINE_DATA(defaultrole, struct cil_default)
-// {
-//     cmp_hash_update(full_hash, sizeof(defaultrole->object), &defaultrole->object);
-//     *partial_hash = cmp_hash_copy(full_hash);
-//     char class_hash[HASH_SIZE];
-//     hash_cil_string_list(defaultrole->class_strs, LIST_ORDER_UNORDERED, class_hash);
-//     cmp_hash_update(full_hash, HASH_SIZE, class_hash);
-// }
-// DEFINE_DATA(defaulttype, struct cil_default)
-// {
-//     cmp_hash_update(full_hash, sizeof(defaulttype->object), &defaulttype->object);
-//     *partial_hash = cmp_hash_copy(full_hash);
-//     char class_hash[HASH_SIZE];
-//     hash_cil_string_list(defaulttype->class_strs, LIST_ORDER_UNORDERED, class_hash);
-//     cmp_hash_update(full_hash, HASH_SIZE, class_hash);
-// }
 DEFINE_DATA(defaultrange, struct cil_defaultrange)
 {
     cmp_hash_update(full_hash, sizeof(defaultrange->object_range), &defaultrange->object_range);
@@ -552,7 +536,7 @@ DEFINE_DATA(filecon, struct cil_filecon)
     *partial_hash = cmp_hash_copy(full_hash);
     if (filecon->context_str || filecon->context) {
         cmp_hash_update_string(full_hash, "<context>");
-        HASH_STR_OR_DATA(full_hash, CIL_CONTEXT, filecon->context_str, filecon->context);
+        hash_str_or_data(full_hash, CIL_CONTEXT, filecon->context_str, filecon->context);
     } else {
         cmp_hash_update_string(full_hash, "<empty_context>");
     }
@@ -562,7 +546,7 @@ DEFINE_DATA(fsuse, struct cil_fsuse)
     (void)partial_hash;
     cmp_hash_update(full_hash, sizeof(fsuse->type), &fsuse->type);
     cmp_hash_update_string(full_hash, fsuse->fs_str);
-    HASH_STR_OR_DATA(full_hash, CIL_CONTEXT, fsuse->context_str, fsuse->context);
+    hash_str_or_data(full_hash, CIL_CONTEXT, fsuse->context_str, fsuse->context);
 }
 DEFINE_DATA(genfscon, struct cil_genfscon)
 {
@@ -570,7 +554,7 @@ DEFINE_DATA(genfscon, struct cil_genfscon)
     cmp_hash_update_string(full_hash, genfscon->path_str);
     cmp_hash_update(full_hash, sizeof(genfscon->file_type), &genfscon->file_type);
     *partial_hash = cmp_hash_copy(full_hash);
-    HASH_STR_OR_DATA(full_hash, CIL_CONTEXT, genfscon->context_str, genfscon->context);
+    hash_str_or_data(full_hash, CIL_CONTEXT, genfscon->context_str, genfscon->context);
 }
 
 /******************************************************************************
@@ -583,14 +567,14 @@ DEFINE_DATA(ibpkeycon, struct cil_ibpkeycon)
     cmp_hash_update(full_hash, sizeof(ibpkeycon->pkey_low), &ibpkeycon->pkey_low);
     cmp_hash_update(full_hash, sizeof(ibpkeycon->pkey_low), &ibpkeycon->pkey_low);
     *partial_hash = cmp_hash_copy(full_hash);
-    HASH_STR_OR_DATA(full_hash, CIL_CONTEXT, ibpkeycon->context_str, ibpkeycon->context);
+    hash_str_or_data(full_hash, CIL_CONTEXT, ibpkeycon->context_str, ibpkeycon->context);
 }
 DEFINE_DATA(ibendportcon, struct cil_ibendportcon)
 {
     cmp_hash_update_string(full_hash, ibendportcon->dev_name_str);
     cmp_hash_update(full_hash, sizeof(ibendportcon->port), &ibendportcon->port);
     *partial_hash = cmp_hash_copy(full_hash);
-    HASH_STR_OR_DATA(full_hash, CIL_CONTEXT, ibendportcon->context_str, ibendportcon->context);
+    hash_str_or_data(full_hash, CIL_CONTEXT, ibendportcon->context_str, ibendportcon->context);
 }
 
 /******************************************************************************
@@ -648,8 +632,8 @@ DEFINE_DATA(levelrange, struct cil_levelrange)
         cmp_hash_update_string(full_hash, "<anonymous::levelrange>");
     }
     *partial_hash = cmp_hash_copy(full_hash);
-    HASH_STR_OR_DATA(full_hash, CIL_LEVEL, levelrange->low_str, levelrange->low);
-    HASH_STR_OR_DATA(full_hash, CIL_LEVEL, levelrange->high_str, levelrange->high);
+    hash_str_or_data(full_hash, CIL_LEVEL, levelrange->low_str, levelrange->low);
+    hash_str_or_data(full_hash, CIL_LEVEL, levelrange->high_str, levelrange->high);
 }
 DEFINE_DATA(rangetransition, struct cil_rangetransition)
 {
@@ -657,7 +641,7 @@ DEFINE_DATA(rangetransition, struct cil_rangetransition)
     cmp_hash_update_string(full_hash, rangetransition->exec_str);
     cmp_hash_update_string(full_hash, rangetransition->obj_str);
     *partial_hash = cmp_hash_copy(full_hash);
-    HASH_STR_OR_DATA(full_hash, CIL_LEVELRANGE, rangetransition->range_str, rangetransition->range);
+    hash_str_or_data(full_hash, CIL_LEVELRANGE, rangetransition->range_str, rangetransition->range);
 }
 
 /******************************************************************************
@@ -687,15 +671,15 @@ DEFINE_DATA(netifcon, struct cil_netifcon)
 {
     cmp_hash_update_string(full_hash, netifcon->interface_str);
     *partial_hash = cmp_hash_copy(full_hash);
-    HASH_STR_OR_DATA(full_hash, CIL_CONTEXT, netifcon->if_context_str, netifcon->if_context);
-    HASH_STR_OR_DATA(full_hash, CIL_CONTEXT, netifcon->packet_context_str, netifcon->packet_context);
+    hash_str_or_data(full_hash, CIL_CONTEXT, netifcon->if_context_str, netifcon->if_context);
+    hash_str_or_data(full_hash, CIL_CONTEXT, netifcon->packet_context_str, netifcon->packet_context);
 }
 DEFINE_DATA(nodecon, struct cil_nodecon)
 {
-    HASH_STR_OR_DATA(full_hash, CIL_IPADDR, nodecon->addr_str, nodecon->addr);
-    HASH_STR_OR_DATA(full_hash, CIL_IPADDR, nodecon->mask_str, nodecon->mask);
+    hash_str_or_data(full_hash, CIL_IPADDR, nodecon->addr_str, nodecon->addr);
+    hash_str_or_data(full_hash, CIL_IPADDR, nodecon->mask_str, nodecon->mask);
     *partial_hash = cmp_hash_copy(full_hash);
-    HASH_STR_OR_DATA(full_hash, CIL_CONTEXT, nodecon->context_str, nodecon->context);
+    hash_str_or_data(full_hash, CIL_CONTEXT, nodecon->context_str, nodecon->context);
 }
 DEFINE_DATA(portcon, struct cil_portcon)
 {
@@ -703,7 +687,7 @@ DEFINE_DATA(portcon, struct cil_portcon)
     cmp_hash_update(full_hash, sizeof(portcon->port_low), &portcon->port_low);
     cmp_hash_update(full_hash, sizeof(portcon->port_high), &portcon->port_high);
     *partial_hash = cmp_hash_copy(full_hash);
-    HASH_STR_OR_DATA(full_hash, CIL_CONTEXT, portcon->context_str, portcon->context);
+    hash_str_or_data(full_hash, CIL_CONTEXT, portcon->context_str, portcon->context);
 }
 
 /******************************************************************************
@@ -761,7 +745,7 @@ DEFINE_DATA(sidcontext, struct cil_sidcontext)
 {
     cmp_hash_update_string(full_hash, sidcontext->sid_str);
     *partial_hash = cmp_hash_copy(full_hash);
-    HASH_STR_OR_DATA(full_hash, CIL_CONTEXT, sidcontext->context_str, sidcontext->context);
+    hash_str_or_data(full_hash, CIL_CONTEXT, sidcontext->context_str, sidcontext->context);
 }
 
 /******************************************************************************
@@ -823,13 +807,13 @@ DEFINE_DATA(userlevel, struct cil_userlevel)
 {
     cmp_hash_update_string(full_hash, userlevel->user_str);
     *partial_hash = cmp_hash_copy(full_hash);
-    HASH_STR_OR_DATA(full_hash, CIL_LEVEL, userlevel->level_str, userlevel->level);
+    hash_str_or_data(full_hash, CIL_LEVEL, userlevel->level_str, userlevel->level);
 }
 DEFINE_DATA(userrange, struct cil_userrange)
 {
     cmp_hash_update_string(full_hash, userrange->user_str);
     *partial_hash = cmp_hash_copy(full_hash);
-    HASH_STR_OR_DATA(full_hash, CIL_LEVELRANGE, userrange->range_str, userrange->range);
+    hash_str_or_data(full_hash, CIL_LEVELRANGE, userrange->range_str, userrange->range);
 }
 DEFINE_DATA_BOUNDS(userbounds)
 DEFINE_DATA(userprefix, struct cil_userprefix)
@@ -843,13 +827,13 @@ DEFINE_DATA(selinuxuser, struct cil_selinuxuser)
     cmp_hash_update_string(full_hash, selinuxuser->name_str);
     *partial_hash = cmp_hash_copy(full_hash);
     cmp_hash_update_string(full_hash, selinuxuser->user_str);
-    HASH_STR_OR_DATA(full_hash, CIL_LEVELRANGE, selinuxuser->range_str, selinuxuser->range);
+    hash_str_or_data(full_hash, CIL_LEVELRANGE, selinuxuser->range_str, selinuxuser->range);
 }
 DEFINE_DATA(selinuxuserdefault, struct cil_selinuxuser)
 {
     *partial_hash = cmp_hash_copy(full_hash);
     cmp_hash_update_string(full_hash, selinuxuserdefault->user_str);
-    HASH_STR_OR_DATA(full_hash, CIL_LEVELRANGE, selinuxuserdefault->range_str, selinuxuserdefault->range);
+    hash_str_or_data(full_hash, CIL_LEVELRANGE, selinuxuserdefault->range_str, selinuxuserdefault->range);
 }
 
 /******************************************************************************
@@ -861,32 +845,32 @@ DEFINE_DATA(iomemcon, struct cil_iomemcon)
     cmp_hash_update(full_hash, sizeof(iomemcon->iomem_low), &iomemcon->iomem_low);
     cmp_hash_update(full_hash, sizeof(iomemcon->iomem_high), &iomemcon->iomem_high);
     *partial_hash = cmp_hash_copy(full_hash);
-    HASH_STR_OR_DATA(full_hash, CIL_CONTEXT, iomemcon->context_str, iomemcon->context);
+    hash_str_or_data(full_hash, CIL_CONTEXT, iomemcon->context_str, iomemcon->context);
 }
 DEFINE_DATA(ioportcon, struct cil_ioportcon)
 {
     cmp_hash_update(full_hash, sizeof(ioportcon->ioport_low), &ioportcon->ioport_low);
     cmp_hash_update(full_hash, sizeof(ioportcon->ioport_high), &ioportcon->ioport_high);
     *partial_hash = cmp_hash_copy(full_hash);
-    HASH_STR_OR_DATA(full_hash, CIL_CONTEXT, ioportcon->context_str, ioportcon->context);
+    hash_str_or_data(full_hash, CIL_CONTEXT, ioportcon->context_str, ioportcon->context);
 }
 DEFINE_DATA(pcidevicecon, struct cil_pcidevicecon)
 {
     cmp_hash_update(full_hash, sizeof(pcidevicecon->dev), &pcidevicecon->dev);
     *partial_hash = cmp_hash_copy(full_hash);
-    HASH_STR_OR_DATA(full_hash, CIL_CONTEXT, pcidevicecon->context_str, pcidevicecon->context);
+    hash_str_or_data(full_hash, CIL_CONTEXT, pcidevicecon->context_str, pcidevicecon->context);
 }
 DEFINE_DATA(pirqcon, struct cil_pirqcon)
 {
     cmp_hash_update(full_hash, sizeof(pirqcon->pirq), &pirqcon->pirq);
     *partial_hash = cmp_hash_copy(full_hash);
-    HASH_STR_OR_DATA(full_hash, CIL_CONTEXT, pirqcon->context_str, pirqcon->context);
+    hash_str_or_data(full_hash, CIL_CONTEXT, pirqcon->context_str, pirqcon->context);
 }
 DEFINE_DATA(devicetreecon, struct cil_devicetreecon)
 {
     cmp_hash_update_string(full_hash, devicetreecon->path);
     *partial_hash = cmp_hash_copy(full_hash);
-    HASH_STR_OR_DATA(full_hash, CIL_CONTEXT, devicetreecon->context_str, devicetreecon->context);
+    hash_str_or_data(full_hash, CIL_CONTEXT, devicetreecon->context_str, devicetreecon->context);
 }
 
 static const struct cmp_data_def data_defs[] = {
