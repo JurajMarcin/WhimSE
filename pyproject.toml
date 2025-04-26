@@ -34,7 +34,14 @@ include = [
 ]
 
 [tool.setuptools.package-data]
-"whimse.report" = ["templates/*"]
+"whimse.report" = [
+    "templates/*",
+]
+
+[tool.pytest.ini_options]
+testpaths = [
+    "tests",
+]
 
 [tool.pylint.main]
 extension-pkg-allow-list = [

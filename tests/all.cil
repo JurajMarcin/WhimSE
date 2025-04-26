@@ -1,0 +1,402 @@
+; Access Vector Rules
+
+    (allow type_1 self (property_service (set)))          ; anonymous
+    (allow type_2 self (zygote (specifyids)))             ; anonymous
+    (allow type_3 self cps_zygote)                        ; named
+    (allow type_4 self (android_classes (set_3)))         ; classmap/classmapping
+    (allow all_types all_types (android_classes (set_2))) ; classmap/classmapping
+
+    (allow type_5 type_5 (property_service (set)))
+    (allow type_1 all_types (property_service (set)))
+
+    (auditallow release_app.process secmark_demo.browser_packet (packet (send recv)))
+
+    (dontaudit zygote.process self (capability (fsetid)))
+
+    (neverallow type_3 all_types (property_service (set)))
+
+    (deny type1 type2 (class1 (perm1))) ; anon
+    (deny type1 type2 hello) ; named
+
+
+; Call / Macro Statements
+
+    (call binder_call (appdomain binderservicedomain (fs (use))))
+
+    (macro binder_call ((type ARG1) (type ARG2) (classpermission ARG3))
+        (allow ARG1 ARG2 (binder (call transfer)))
+        (allow ARG2 ARG1 (binder (transfer)))
+        (allow ARG1 ARG2 ARG3)
+    )
+
+
+; Class and Permission Statements
+
+    (common file (ioctl read write create getattr setattr lock relabelfrom relabelto append unlink link rename execute swapon quotaon mounton))
+
+    (classcommon dir file)
+
+    (class sem ())
+
+    (class dir (add_name remove_name reparent search rmdir open audit_access execmod))
+
+    (classorder (file dir))
+    (classorder (dir process))
+    (classorder (unordered sem))
+
+    (classpermission zygote_1)
+    (classpermissionset zygote_1 (zygote
+        (not
+            (specifyinvokewith specifyseinfo)
+        )
+    ))
+
+    (classpermission zygote_2)
+    (classpermissionset zygote_2 (zygote
+        (and
+            (all)
+            (not (specifyinvokewith specifyseinfo))
+        )
+    ))
+
+    (classpermission zygote_all_perms)
+    (classpermissionset zygote_all_perms (zygote (all)))
+
+    (classmap android_classes (set_1 set_2 set_3))
+
+    (classmapping android_classes set_1 (binder (all)))
+    (classmapping android_classes set_1 (property_service (set)))
+    (classmapping android_classes set_1 (zygote (not (specifycapabilities))))
+
+    (classmapping android_classes set_2 (binder (impersonate call set_context_mgr transfer)))
+    (classmapping android_classes set_2 (zygote (specifyids specifyrlimits specifycapabilities specifyinvokewith)))
+
+    (classmapping android_classes set_3 cps_zygote)
+    (classmapping android_classes set_3 (binder (impersonate call set_context_mgr)))
+
+    (permissionx ioctl_1 (ioctl tcp_socket (0x2000 0x3000 0x4000)))
+    (permissionx ioctl_2 (ioctl tcp_socket (range 0x6000 0x60FF)))
+    (permissionx ioctl_3 (ioctl tcp_socket (and (range 0x8000 0x90FF) (not (range 0x8100 0x82FF)))))
+
+
+; Conditional Statements
+
+    (boolean disableAudio false)
+
+    (booleanif disableAudio
+        (false
+            (allow process mediaserver.audio_device (chr_file_set (rw_file_perms)))
+        )
+    )
+
+    (boolean disableAudioCapture false)
+
+    (booleanif (and (not disableAudio) (not disableAudioCapture))
+        (true
+            (allow process mediaserver.audio_capture_device (chr_file_set (rw_file_perms)))
+        )
+        (false
+            (allow process mediaserver.audio_capture_device (chr_file_set (rw_file_perms)))
+        )
+    )
+
+    (tunable range_trans_rule true)
+
+    (tunableif range_trans_rule
+        (true
+            (allow process mediaserver.audio_capture_device (chr_file_set (rw_file_perms)))
+        )
+    )
+
+
+; Constraint Statements
+
+    (constrain (file (write))
+        (or
+            (and
+                (eq t1 unconfined.process)
+                (eq t2 unconfined.object)
+            )
+            (eq r1 r2)
+        )
+    )
+
+    (constrain (file (read))
+        (not
+            (or
+                (and
+                    (eq t1 unconfined.process)
+                    (eq t2 unconfined.object)
+                )
+                (eq r1 r2)
+            )
+        )
+    )
+
+    (validatetrans file (eq t1 unconfined.process))
+
+    (mlsconstrain (file (open))
+        (or
+            (and
+                (eq l1 l2)
+                (eq u1 u2)
+            )
+            (neq r1 r2)
+        )
+    )
+
+    (mlsvalidatetrans file (domby l1 h2))
+
+
+; Container Statements
+
+    (block a
+        (allow A B (C (D)))
+    )
+
+    (block b
+        (blockabstract b)
+        (allow A B (C (D)))
+    )
+
+    (block c
+        (blockinherit b)
+        (allow A B (C (D)))
+    )
+
+    (optional move_file
+        (allow process msg_filter.move_file.in_queue (dir (read getattr write search add_name)))
+        (allow process msg_filter.move_file.in_file (file (write create getattr)))
+        (allow msg_filter.move_file.in_file unconfined.object (filesystem (associate)))
+        (allow msg_filter.int_gateway.process msg_filter.move_file.out_queue (dir (read write search)))
+        (allow msg_filter.int_gateway.process msg_filter.move_file.out_file (file (read getattr unlink)))
+    )
+
+    (in system_server
+        (dontaudit process secmark_demo.dns_packet (packet (send recv)))
+        (allow process secmark_demo.dns_packet (packet (send recv)))
+    )
+
+    (in after system_server
+        (dontaudit process secmark_demo.dns_packet (packet (send recv)))
+        (allow process secmark_demo.dns_packet (packet (send recv)))
+    )
+
+    
+; Context Statement
+
+    (context runas_exec_context (u object_r exec ((s0) (s1))))
+
+    (context runas_exec_context2 (u object_r exec (level_2 level_2)))
+
+    (context runas_exec_context3 (u object_r exec low_low))
+
+; Default Object Statements
+
+    (defaultuser (android_classes memprotect) source)
+
+    (defaultrole (binder property_service zygote) target)
+
+    (defaulttype socket source)
+
+    (defaultrange file target low-high)
+
+    (defaultrange db_table glblub)
+
+; File Labeling Statements
+
+    (filecon "/system/bin/run-as" file runas_exec_context)
+    (filecon "/dev/socket/wpa_wlan[0-9]" any (u object_r wpa.socket low_low))
+    (filecon "/data/local/mine" dir ())
+
+    (fsuse xattr ex4 file.labeledfs_context)
+    (fsuse xattr btrfs (u object_r wpa.socket low_low))
+
+    (fsuse task pipefs file.pipefs_context)
+    (fsuse task sockfs (u object_r wpa.socket low_low))
+
+    (fsuse trans devpts file.devpts_context)
+    (fsuse trans tmpfs (u object_r wpa.socket low_low))
+
+    (genfscon proc / proc_context)
+    (genfscon proc /net/xt_qtaguid/ctrl qtaguid_proc_context)
+    (genfscon proc /sysrq-trigger (u object_r wpa.socket low_low))
+    (genfscon selinuxfs / selinuxfs_context)
+
+; Infiniband Statements
+
+    (ibpkeycon fe80:: (0 0x10) (system_u system_r kernel_t low_low))
+
+    (ibendportcon mlx5_0 1 system_u_bin_t_l2h)
+
+; Multi-Level Security Labeling Statements
+
+    (sensitivity s0)
+    (sensitivity s1)
+    (sensitivity s2)
+
+    (sensitivityalias unclassified)
+    (sensitivityalias SystemLow)
+    (sensitivityaliasactual unclassified s0)
+    (sensitivityaliasactual SystemLow s0)
+
+    (sensitivityorder (SystemLow s1 s2))
+
+    (category c0)
+    (category c1)
+    (category c2)
+
+    (categoryalias documents)
+    (categoryaliasactual documents c0)
+
+    (categoryorder (documents c1 c2))
+
+    (categoryset catrange_1 (range c2 c3))
+
+    (categoryset just_c0 (xor (c1 c2) (documents c1 c2)))
+
+    (sensitivitycategory s0 catset_3)
+    (sensitivitycategory s0 (all))
+
+    (level level_1 (s0))
+    (level level_2 (s0 (catrange_1)))
+
+    (levelrange levelrange_2 (level_2 level_2))
+    (levelrange levelrange_1 ((s0) level_2))
+
+    (rangetransition init.process sshd.exec process low_high)
+    (rangetransition init.process sshd.exec process (level_2 level_2))
+
+; Network Labeling Statements
+
+    (ipaddr netmask_1 255.255.255.0)
+
+    (ipaddr local6 ::1)
+
+    (netifcon eth0 context_1 (unconfined.user object_r unconfined.object levelrange_1))
+    (netifcon eth1 context_1 (unconfined.user object_r unconfined.object ((s0) level_1)))
+    (netifcon eth3 context_1 context_2)
+
+    (ipaddr ipv6_2  2001:db8:1:0:0:0:0:0)
+
+    (nodecon ipv4_1 netmask_1 context_2)
+    (nodecon 192.0.2.64 255.255.255.255 context_1)
+    (nodecon (192.0.2.64) netmask_1 (unconfined.user object_r unconfined.object ((s0) (s0 (c0)))))
+
+    (portcon udp 4444 ctx)
+    (portcon tcp (2000 20000) (unconfined.user object_r unconfined.object (systemlow level_3)))
+
+; Policy Configuration Statements
+
+    (mls true)
+
+    (handleunknown allow)
+
+    (policycap network_peer_controls)
+
+; Role Statements
+
+    (role role)
+
+    (roletype role process)
+
+    (roleattribute role_holder)
+    (roleattributeset role_holder (role_1 role_2 role_3))
+
+    (roleattribute role_holder_all)
+    (roleattributeset role_holder_all (all))
+
+    (roleallow unconfined.role msg_filter.role)
+    (roletransition unconfined.role exec process msg_filter.role)
+
+    (rolebounds role test)
+
+; SID Statements
+
+    (sid kernel)
+    (sid security)
+    (sidorder (kernel security))
+    (sidcontext kernel kernel_context)
+    (sid unlabeled)
+    (sidcontext unlabeled (u object_r object_t ((s0) (s0))))
+
+; Type Statements
+
+    (type process)
+
+    (typealias unconfined_t)
+    (typealiasactual unconfined_t process)
+
+    (typeattribute not_in_appdomain)
+
+    (typeattributeset not_in_appdomain (not (appdomain)))
+
+    (typeattribute na_kernel_or_ueventd_or_init_in_domain)
+
+    (typeattributeset na_kernel_or_ueventd_or_init_in_domain
+        (and
+            (and
+                (and
+                    (domain)
+                    (not (kernel.process))
+                )
+                (not (ueventd.process))
+            )
+            (not (init.process))
+        )
+    )
+
+    (expandtypeattribute (file_type port_type) false)
+
+    (typebounds process child.process)
+
+    (typechange object object2 file change_label)
+
+    (typemember object object2 file member_label)
+
+    (typetransition ARG1 ARG2 process ARG3)
+
+    (typetransition src tgt cls "name  hello" res)
+
+    (typepermissive process)
+
+; User Statements
+
+    (user user)
+
+    (userrole user role)
+
+    (userattribute user_holder)
+
+    (userattributeset user_holder (user_1 user_2 user_3))
+
+    (userattribute user_holder_all)
+    (userattributeset user_holder_all (all))
+
+    (userlevel user Systemlow)
+    (userlevel user (s0))
+
+    (userrange user low_high)
+    (userrange user ((s0) (s0 (c0 c1))))
+
+    (userbounds user .test)
+
+    (userprefix admin user)
+
+    (selinuxuser admin_1 admin low_low)
+    (selinuxuser admin_1 admin ((s0) (s0)))
+
+    (selinuxuserdefault user low_low)
+    (selinuxuserdefault user ((s0) (s0)))
+
+; Xen Statements
+
+    (iomemcon (1043424 1043455) (unconfined.user object_r unconfined.object low_low))
+
+    (ioportcon 60608 (unconfined.user object_r unconfined.object low_low))
+
+    (pcidevicecon 51200 (unconfined.user object_r unconfined.object low_low))
+
+    (pirqcon 33 (unconfined.user object_r unconfined.object low_low))
+
+    (devicetreecon "/this is/a/path" (unconfined.user object_r unconfined.object low_low))
