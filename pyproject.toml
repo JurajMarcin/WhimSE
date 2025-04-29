@@ -38,6 +38,16 @@ include = [
     "templates/*",
 ]
 
+[tool.tox]
+requires = [
+    "tox",
+    "pytest",
+]
+
+[tool.tox.env_run_base]
+description = "Run test under {base_python}"
+commands = [["pytest"]]
+
 [tool.pytest.ini_options]
 testpaths = [
     "tests",

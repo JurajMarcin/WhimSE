@@ -1,6 +1,6 @@
 Name:    whimse
-Version: 0.1
-Release: 6%{?dist}
+Version: 0.2
+Release: 1%{?dist}
 Summary: What Have I Modified in SELinux
 
 License: GPL-3.0-or-later
@@ -8,6 +8,8 @@ URL:     https://github.com/JurajMarcin/whimse
 Source:  %{url}/archive/v%{version}/whimse-%{version}.tar.gz
 
 BuildRequires: python3-devel
+# Test dependencies
+BuildRequires: python3-audit
 
 Requires: cildiff%{?_isa} = %{version}-%{release}
 Requires: cpio
@@ -42,7 +44,7 @@ cildiff is a helper application that compares two CIL SELinux policies.
 
 
 %generate_buildrequires
-%pyproject_buildrequires
+%pyproject_buildrequires -t
 
 
 %build
@@ -60,6 +62,10 @@ cildiff is a helper application that compares two CIL SELinux policies.
 %pyproject_save_files -L whimse
 
 
+%check
+%tox
+
+
 %files -f %{pyproject_files}
 %doc README.md
 %license LICENSE
@@ -72,6 +78,9 @@ cildiff is a helper application that compares two CIL SELinux policies.
 
 
 %changelog
+* Tue Apr 29 2025 Juraj Marcin <juraj@jurajmarcin.com> - 0.2-1
+- Update to 0.2
+
 * Sun Apr 06 2025 Juraj Marcin <juraj@jurajmarcin.com> - 0.1-6
 - Add missing cpio dependency
 

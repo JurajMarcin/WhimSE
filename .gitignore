@@ -177,3 +177,8 @@ pyrightconfig.json
 
 # Allow RPM SPEC file
 !whimse.spec
+
+# fedpkg mockbuild artifacts
+results_whimse
+*.rpm
+*.tar.gz
