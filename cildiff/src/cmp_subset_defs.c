@@ -132,6 +132,35 @@ static int sim_array_item_qsort_cmp(const void *a, const void *b)
     return -cmp_sim_cmp(&item1->sim, &item2->sim);
 }
 
+static struct sim_array_item *
+sim_array_compute(size_t unique_left_count,
+                  const struct cmp_node *unique_left[unique_left_count],
+                  size_t unique_right_count,
+                  const struct cmp_node *unique_right[unique_right_count])
+{
+    if (!unique_left_count || !unique_right_count) {
+        /* Unique nodes only on one side */
+        return NULL;
+    }
+    struct sim_array_item *sims =
+        mem_alloc(unique_left_count * unique_right_count * sizeof(*sims));
+    for (size_t left_i = 0; left_i < unique_left_count; left_i++) {
+        for (size_t right_i = 0; right_i < unique_right_count; right_i++) {
+            sims[left_i * unique_right_count + right_i] =
+                (struct sim_array_item) {
+                    .sim = cmp_node_sim(unique_left[left_i],
+                                        unique_right[right_i]),
+                    .left_i = left_i,
+                    .right_i = right_i,
+                };
+        }
+    }
+    qsort(sims, unique_left_count * unique_right_count, sizeof(*sims),
+          &sim_array_item_qsort_cmp);
+
+    return sims;
+}
+
 DECLARE_SUBSET_COMPARE(container_sim)
 {
     size_t unique_left_count = 0;
@@ -154,29 +183,9 @@ DECLARE_SUBSET_COMPARE(container_sim)
     };
     hashtab_map(MAYBE(right, items), &container_sim_compare_map, &compare_args);
 
-    if (!unique_left_count || !unique_right_count) {
-        for (size_t i = 0; i < unique_left_count; i++) {
-            diff_tree_append_diff(diff_node, DIFF_LEFT, unique_left[i], NULL);
-        }
-        for (size_t i = 0; i < unique_right_count; i++) {
-            diff_tree_append_diff(diff_node, DIFF_RIGHT, unique_right[i], NULL);
-        }
-        goto free_unique;
-    }
-
-    struct sim_array_item *sims = mem_alloc(unique_left_count * unique_right_count * sizeof(*sims));
-    for (size_t left_i = 0; left_i < unique_left_count; left_i++) {
-        for (size_t right_i = 0; right_i < unique_right_count; right_i++) {
-            sims[left_i * unique_right_count + right_i] = (struct sim_array_item) {
-                .sim = cmp_node_sim(unique_left[left_i], unique_right[right_i]),
-                .left_i = left_i,
-                .right_i = right_i,
-            };
-        }
-    }
-
-    qsort(sims, unique_left_count * unique_right_count, sizeof(*sims), &sim_array_item_qsort_cmp);
-
+    struct sim_array_item *sims = sim_array_compute(
+        unique_left_count, unique_left, unique_right_count, unique_right);
+    /* Match nodes based on similarity */
     for (size_t i = 0; i < unique_left_count * unique_right_count; i++) {
         const struct cmp_node *left_node = unique_left[sims[i].left_i];
         const struct cmp_node *right_node = unique_right[sims[i].right_i];
@@ -187,6 +196,7 @@ DECLARE_SUBSET_COMPARE(container_sim)
         unique_left[sims[i].left_i] = NULL;
         unique_right[sims[i].right_i] = NULL;
     }
+    /* Handle unmatched nodes */
     for (size_t i = 0; i < unique_left_count; i++) {
         if (!unique_left[i]) {
             continue;
@@ -203,7 +213,6 @@ DECLARE_SUBSET_COMPARE(container_sim)
     }
 
     mem_free(sims);
-free_unique:
     mem_free(unique_left);
     mem_free(unique_right);
 }
