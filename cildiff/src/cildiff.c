@@ -25,22 +25,22 @@
 #include <cil_build_ast.h>
 #include <cil_internal.h>
 
-#include "cil_file.h"
 #include "cmp_common.h"
 #include "cmp_node.h"
 #include "diff.h"
 #include "json.h"
 #include "options.h"
+#include "utils.h"
 
 
 int load_cil_file(cil_db_t *cil_db, const char *file_path)
 {
     int rc = -1;
-    struct cil_file cil_file = {0};
+    struct file_data data = {0};
 
-    if (cil_file_read(file_path, &cil_file))
+    if (file_read(file_path, &data))
         goto exit;
-    if (cil_add_file(cil_db, file_path, cil_file.data, cil_file.data_len) != SEPOL_OK)
+    if (cil_add_file(cil_db, file_path, data.data, data.len) != SEPOL_OK)
         goto exit;
     if (cil_build_ast(cil_db, cil_db->parse->root, cil_db->ast->root) != SEPOL_OK) {
         error(0,0, "Failed to build CIL AST of '%s'", file_path);
@@ -49,7 +49,7 @@ int load_cil_file(cil_db_t *cil_db, const char *file_path)
     rc = 0;
 
 exit:
-    cil_file_destroy(&cil_file);
+    file_data_destroy(&data);
     return rc;
 }
 
