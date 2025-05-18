@@ -37,9 +37,7 @@ class PolicyExplorer[PolicyT: Policy]:
     def policy_store(self) -> Path:
         raise NotImplementedError()
 
-    def _read_local_mod_file[
-        ContainerT, T
-    ](
+    def _read_local_mod_file[ContainerT, T](
         self,
         path: Path,
         container: Callable[[Iterable[T]], ContainerT],

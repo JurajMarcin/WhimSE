@@ -92,7 +92,8 @@ class DNFPackageManager(PackageManager):
         _logger.debug("Searching for policy modules in package %r", package.full_name)
 
         for file, flags in package_files.items():
-            if match := self._store_module_pattern.match(file):
+            match = self._store_module_pattern.match(file)
+            if match:
                 name = match.group("module_name")
                 priority = int(match.group("priority"))
                 # Package contains module directory in policy store
@@ -183,7 +184,7 @@ class DNFPackageManager(PackageManager):
                     package.full_name,
                 )
                 install_file_match = PROVIDED_MODULE_PATTERN.search(install_file)
-                if install_file_match is None:
+                if not install_file_match:
                     _logger.warning(
                         "File %r installed with package %r has invalid language extension",
                         install_file,
@@ -219,7 +220,7 @@ class DNFPackageManager(PackageManager):
             )
             package_modules = self._find_package_modules(package, package_files)
             if (
-                rpm_package[RPMTAG_POSTIN] is not None
+                rpm_package[RPMTAG_POSTIN]
                 and rpm_package[RPMTAG_POSTINPROG]
                 and rpm_package[RPMTAG_POSTINPROG][0].split("/")[-1]
                 in ("sh", "bash", "zsh")
@@ -313,7 +314,8 @@ class DNFPackageManager(PackageManager):
             try:
                 return next(self._rpms_cache_path.glob(f"{package.full_name}*.rpm"))
             except StopIteration:
-                if epoch_match := re.match(r"^(?P<epoch>\d+:)\d.*$", package.version):
+                epoch_match = re.match(r"^(?P<epoch>\d+:)\d.*$", package.version)
+                if epoch_match:
                     return next(
                         self._rpms_cache_path.glob(
                             f"{package.full_name.replace(epoch_match.group('epoch'), '', 1)}*.rpm"

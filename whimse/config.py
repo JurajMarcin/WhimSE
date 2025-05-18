@@ -13,8 +13,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-from argparse import Action, ArgumentParser, FileType, Namespace, RawTextHelpFormatter
-from collections.abc import Sequence
+from argparse import ArgumentParser, FileType, RawTextHelpFormatter
 from configparser import ConfigParser
 from dataclasses import dataclass
 from datetime import datetime
@@ -23,28 +22,11 @@ from logging import DEBUG, INFO
 from pathlib import Path
 from sys import stdout
 from tempfile import mkdtemp
-from typing import Any, TextIO
+from typing import TextIO
 
 from selinux import selinux_getpolicytype
 
 from whimse.types.reports import ReportFormat
-
-
-class ExtendListAction(Action):
-    def __call__(
-        self,
-        parser: ArgumentParser,
-        namespace: Namespace,
-        values: str | Sequence[Any] | None,
-        option_string: str | None = None,
-    ) -> None:
-        del parser
-        del option_string
-        if not values:
-            return
-        if not hasattr(namespace, self.dest):
-            setattr(namespace, self.dest, [])
-        getattr(namespace, self.dest).extend(values)
 
 
 class ModuleFetchMethod(StrEnum):
@@ -110,7 +92,6 @@ class Config:
             "detect and report differences between current and distribution policy",
             formatter_class=RawTextHelpFormatter,
         )
-        parser.register("action", "extend", ExtendListAction)
 
         parser.add_argument(
             "-V", "--version", action="version", version=version, help="Show version"

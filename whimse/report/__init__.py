@@ -14,6 +14,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 from logging import getLogger
+
 from whimse.config import Config
 from whimse.report.common import ReportFormatter
 from whimse.report.html import HTMLReportFormatter

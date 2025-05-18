@@ -93,7 +93,7 @@ class LocalModificationsReportFormatter(BaseReportFormatter[LocalModificationsRe
 
     @property
     def _shown(self) -> bool:
-        return self._config.full_report or len(self._report.changes) > 0
+        return bool(self._config.full_report or self._report.changes)
 
     @property
     def _change_count(self) -> tuple[int, int]:
@@ -122,14 +122,17 @@ class PolicyModuleReportFormatter(BaseReportFormatter[PolicyModuleReport]):
 
     @property
     def _shown(self) -> bool:
-        return (
-            self._config.full_report
-            or len(self._report.flags) > 0
-            or self._report.change_type is not None
-            or (self._report.diff is not None and self._report.diff.contains_changes)
-        ) and (
-            self._config.show_lookalikes
-            or PolicyModuleReportFlag.LOOKALIKE not in self._report.flags
+        return bool(
+            (
+                self._config.full_report
+                or self._report.flags
+                or self._report.change_type
+                or (self._report.diff and self._report.diff.contains_changes)
+            )
+            and (
+                self._config.show_lookalikes
+                or PolicyModuleReportFlag.LOOKALIKE not in self._report.flags
+            )
         )
 
     @property

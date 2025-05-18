@@ -49,16 +49,16 @@ def _get_commands(tokens: list[str]) -> Iterable[tuple[str, ...]]:
     cmd: list[str] = []
     for token in tokens:
         if token in ("||", "&&", "&", "|", ";", "do"):
-            if len(cmd) > 0:
+            if cmd:
                 yield tuple(cmd)
                 cmd = []
-        elif len(token) > 0 and token[-1] == ";":
+        elif token and token[-1] == ";":
             cmd.append(token[:-1])
             yield tuple(cmd)
             cmd = []
         else:
             cmd.append(token)
-    if len(cmd) > 0:
+    if cmd:
         yield tuple(cmd)
 
 
@@ -66,18 +66,18 @@ def get_command_executions(
     script: str, cmd_pattern: Pattern, env: dict[str, set[str]] | None = None
 ) -> Iterable[tuple[str, ...]]:
     lines = iter(script.splitlines())
-    if env is None:
+    if not env:
         env = {}
     while True:
         line = None
         try:
             line = next(lines)
-            while len(line) >= 1 and line[-1] == "\\":
+            while line and line[-1] == "\\":
                 line = line[:-1]
                 # Separate to remove '\' even if next() raises StopIteration here
                 line += " " + next(lines)
         except StopIteration:
-            if line is None:
+            if not line:
                 return
 
         while True:
@@ -99,28 +99,16 @@ def get_command_executions(
                 and re.match(r"^(?P<name>[a-zA-Z0-9_]+)\+?=(?P<value>.*)$", cmd[1])
             ):
                 cmd = cmd[1:]
-            if len(cmd) > 0 and cmd_pattern.match(cmd[0]):
+            if cmd and cmd_pattern.match(cmd[0]):
                 yield from _expand_env(cmd, env)
-            elif (
-                len(cmd) == 1
-                and (
-                    match := re.match(
-                        r"^(?P<name>[a-zA-Z0-9_]+)=(?P<value>.*)$", cmd[0]
-                    )
-                )
-                is not None
+            elif len(cmd) == 1 and (
+                match := re.match(r"^(?P<name>[a-zA-Z0-9_]+)=(?P<value>.*)$", cmd[0])
             ):
                 env[match.group("name")] = {
                     t[0] for t in _expand_env((match.group("value"),), env)
                 }
-            elif (
-                len(cmd) == 1
-                and (
-                    match := re.match(
-                        r"^(?P<name>[a-zA-Z0-9_]+)\+=(?P<value>.*)$", cmd[0]
-                    )
-                )
-                is not None
+            elif len(cmd) == 1 and (
+                match := re.match(r"^(?P<name>[a-zA-Z0-9_]+)\+=(?P<value>.*)$", cmd[0])
             ):
                 expanded = list(_expand_env((match.group("value"),), env))
                 env[match.group("name")] = {

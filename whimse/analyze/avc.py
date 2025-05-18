@@ -116,7 +116,7 @@ class AVRuleAVCMatcher(AVCMatcher):
             and node.target in self._ttypes
             and isinstance(node.classperms, CilClassperms)
             and node.classperms.cls == self._avc.tcls
-            and node.classperms.perms.operator is None
+            and not node.classperms.perms.operator
             and self._avc.perms in node.classperms.perms.operands
         )
 
@@ -202,7 +202,7 @@ class AVCAnalysis(Analysis[Report]):
             )
             for matcher in matchers:
                 for policy_module_report in report.policy_modules:
-                    if policy_module_report.diff is None:
+                    if not policy_module_report.diff:
                         continue
                     _logger.debug(
                         "Searching report for module %r/%r with matcher %r",

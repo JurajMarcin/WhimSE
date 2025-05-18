@@ -76,7 +76,7 @@ class PolicyModulesChangeDetector(ChangesDetector):
                 active_module.name, _PolicyModulePair(effective_pair=True)
             )
             if (
-                highest_pair.active_module is None
+                not highest_pair.active_module
                 or highest_pair.active_module.priority < active_module.priority
             ):
                 highest_pair.active_module = active_module
@@ -90,7 +90,7 @@ class PolicyModulesChangeDetector(ChangesDetector):
                 dist_module.module.name, _PolicyModulePair(effective_pair=True)
             )
             if (
-                highest_pair.dist_module is None
+                not highest_pair.dist_module
                 or highest_pair.dist_module.module.priority
                 < dist_module.module.priority
             ):
@@ -119,17 +119,17 @@ class PolicyModulesChangeDetector(ChangesDetector):
                 yield highest_pair
 
     def _get_cil_file_path(self, module: PolicyModule | None, dist: bool) -> Path:
-        if module is None:
+        if not module:
             return Path("/dev/null")
         cil_path = module.get_file(PolicyModuleLang.CIL)
-        if cil_path is not None:
+        if cil_path:
             return (
                 Path(cil_path)
                 if not dist
                 else self._dist_policy.get_file_path(cil_path)
             )
         hll_path = module.get_file(PolicyModuleLang.HLL)
-        assert hll_path is not None
+        assert hll_path
         cil_cache_path = self._config.cil_cache_path(hll_path, dist)
         cil_cache_path.parent.mkdir(parents=True, exist_ok=True)
         if dist:
@@ -150,28 +150,28 @@ class PolicyModulesChangeDetector(ChangesDetector):
             active_module=pair.active_module, dist_module=pair.dist_module
         )
         if (
-            pair.active_module is None
-            and pair.dist_module is not None
+            not pair.active_module
+            and pair.dist_module
             and pair.dist_module.source.install_method
             == PolicyModuleInstallMethod.UNKNOWN
-            and len(pair.dist_module.module.files) > 0
+            and pair.dist_module.module.files
         ):
             # Files looking like policy files but no module
             report.flags.add(PolicyModuleReportFlag.LOOKALIKE)
             return report
         if (
-            pair.dist_module is not None
+            pair.dist_module
             and pair.dist_module.source.install_method
             == PolicyModuleInstallMethod.UNKNOWN
-            and len(pair.dist_module.module.files) == 0
+            and not pair.dist_module.module.files
         ):
             # Dist module with ghost files
             report.flags.add(PolicyModuleReportFlag.GENERATED)
             if not pair.active_module:
                 report.change_type = ChangeType.DELETION
             return report
-        if pair.dist_module is not None:
-            if pair.dist_module.source.fetch_package is None:
+        if pair.dist_module:
+            if not pair.dist_module.source.fetch_package:
                 report.flags.add(PolicyModuleReportFlag.USING_LOCAL_POLICY)
             elif (
                 pair.dist_module.source.source_package
@@ -179,16 +179,17 @@ class PolicyModulesChangeDetector(ChangesDetector):
             ):
                 report.flags.add(PolicyModuleReportFlag.USING_NEWER_POLICY)
         if (
-            pair.active_module is not None
-            and pair.dist_module is not None
+            pair.active_module
+            and pair.dist_module
             and pair.dist_module.source.install_method
             == PolicyModuleInstallMethod.UNKNOWN
-            and len(pair.dist_module.module.files) > 0
+            and pair.dist_module.module.files
         ):
+            # Active and dist modules with files, but undetected install method
             report.flags.add(PolicyModuleReportFlag.UNKNOWN_INSTALL_METHOD)
-        assert (pair.active_module is None or len(pair.active_module.files) > 0) and (
-            pair.dist_module is None or len(pair.dist_module.module.files) > 0
-        )
+        # At this point both modules are either missing or have module files
+        assert not pair.active_module or pair.active_module.files
+        assert not pair.dist_module or pair.dist_module.module.files
         active_path = self._get_cil_file_path(pair.active_module, False)
         dist_path = self._get_cil_file_path(
             pair.dist_module.module if pair.dist_module else None, True
@@ -196,9 +197,9 @@ class PolicyModulesChangeDetector(ChangesDetector):
         report.diff = cildiff(self._config, active_path, dist_path)
         report.effective = pair.effective_pair
 
-        if pair.active_module is None:
+        if not pair.active_module:
             report.change_type = ChangeType.DELETION
-        elif pair.dist_module is None:
+        elif not pair.dist_module:
             report.change_type = ChangeType.ADDITION
         elif report.diff.contains_changes:
             report.change_type = ChangeType.MODIFICATION

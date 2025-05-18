@@ -41,6 +41,22 @@ class CilBase:
         return "\n".join("    " * indent + line for line, indent in self.cil(indent))
 
 
+class _CilAnonymousNodeBase(CilBase):
+    flavor: Any
+    id: str | None
+
+    def cil(self, indent: int = 0) -> Iterable[tuple[str, int]]:
+        if self.id:
+            yield f"({self.flavor} {self.id}", indent
+        yield from self._anonymous_cil(indent + 1)
+        if self.id:
+            yield ")", indent
+
+    def _anonymous_cil(self, indent: int = 0) -> Iterable[tuple[str, int]]:
+        del indent
+        raise NotImplementedError()
+
+
 def _str_or_cil(value: str | CilBase, indent: int) -> Iterable[tuple[str, int]]:
     if isinstance(value, str):
         yield value, indent
@@ -75,15 +91,10 @@ class CilExpr(BaseModel, CilBase):
     operands: list["str | CilExpr"]
 
     def cil(self, indent: int = 0) -> Iterable[tuple[str, int]]:
-        if self.operator is None and all(
-            isinstance(oper, str) for oper in self.operands
-        ):
+        if not self.operator and all(isinstance(oper, str) for oper in self.operands):
             yield f"({_list_join(self.operands)})", indent
             return
-        if self.operator is None:
-            yield "(", indent
-        else:
-            yield f"({self.operator}", indent
+        yield f"({self.operator or ''}", indent
         for oper in self.operands:
             yield from _str_or_cil(oper, indent + 1)
         yield ")", indent
@@ -172,12 +183,8 @@ class CilMacro(BaseModel, CilNodeBase, CilContainerBase):
     params: list[CilMacroParam]
 
     def cil(self, indent: int = 0) -> Iterable[tuple[str, int]]:
-        params_str = (
-            "("
-            + " ".join(f"({param.type} {param.name})" for param in self.params)
-            + ")"
-        )
-        yield f"({self.flavor} {self.id} {params_str}", indent
+        params_str = " ".join(f"({param.type} {param.name})" for param in self.params)
+        yield f"({self.flavor} {self.id} ({params_str})", indent
         yield from chain(*(child.cil(indent + 1) for child in self.children))
         yield ")", indent
 
@@ -261,23 +268,17 @@ class CilPermissionxKind(StrEnum):
     NLMSG = "nlmsg"
 
 
-class CilPermissionx(BaseModel, CilNodeBase):
+class CilPermissionx(BaseModel, CilNodeBase, _CilAnonymousNodeBase):
     flavor: Literal["permissionx"]
     id: str | None
     kind: CilPermissionxKind
     cls: str = Field(alias="class")
     perms: CilExpr
 
-    def cil(self, indent: int = 0) -> Iterable[tuple[str, int]]:
-        if self.id is not None:
-            yield f"({self.flavor} {self.id}", indent
-            indent += 1
+    def _anonymous_cil(self, indent: int = 0) -> Iterable[tuple[str, int]]:
         yield f"({self.kind} {self.cls}", indent
         yield from self.perms.cil(indent + 1)
         yield ")", indent
-        if self.id is not None:
-            indent -= 1
-            yield ")", indent
 
 
 #
@@ -434,7 +435,7 @@ class CilIn(BaseModel, CilNodeBase, CilContainerBase):
 #
 
 
-class CilContext(BaseModel, CilNodeBase):
+class CilContext(BaseModel, CilNodeBase, _CilAnonymousNodeBase):
     flavor: Literal["context"]
     id: str | None
     user: str
@@ -442,16 +443,10 @@ class CilContext(BaseModel, CilNodeBase):
     type: str
     levelrange: "str | CilLevelrange"
 
-    def cil(self, indent: int = 0) -> Iterable[tuple[str, int]]:
-        if self.id is not None:
-            yield f"({self.flavor} {self.id}", indent
-            indent += 1
+    def _anonymous_cil(self, indent: int = 0) -> Iterable[tuple[str, int]]:
         yield f"({self.user} {self.role} {self.type} ", indent
         yield from _str_or_cil(self.levelrange, indent + 1)
         yield ")", indent
-        if self.id is not None:
-            indent -= 1
-            yield ")", indent
 
 
 #
@@ -494,7 +489,7 @@ class CilDefaultrange(BaseModel, CilNodeBase):
     def cil(self, indent: int = 0) -> Iterable[tuple[str, int]]:
         yield (
             f"({self.flavor} ({_list_join(self.cls)}) {self.default} "
-            f"{self.range if self.range is not None else ''})"
+            f"{self.range or ''})"
         ), indent
 
 
@@ -522,10 +517,10 @@ class CilFilecon(BaseModel, CilNodeBase):
 
     def cil(self, indent: int = 0) -> Iterable[tuple[str, int]]:
         yield f'({self.flavor} "{self.path}" {self.file_type}', indent
-        if self.context is None:
-            yield "()", indent
-        else:
+        if self.context:
             yield from _str_or_cil(self.context, indent + 1)
+        else:
+            yield "()", indent
         yield ")", indent
 
 
@@ -667,42 +662,30 @@ class CilSensitivitycategory(BaseModel, CilNodeBase):
         yield ")", indent
 
 
-class CilLevel(BaseModel, CilNodeBase):
+class CilLevel(BaseModel, CilNodeBase, _CilAnonymousNodeBase):
     flavor: Literal["level"]
     id: str | None
     sensitivity: str
     category: CilExpr | None
 
-    def cil(self, indent: int = 0) -> Iterable[tuple[str, int]]:
-        if self.id is not None:
-            yield f"({self.flavor} {self.id}", indent
-            indent += 1
+    def _anonymous_cil(self, indent: int = 0) -> Iterable[tuple[str, int]]:
         yield f"({self.sensitivity}", indent
-        if self.category is not None:
+        if self.category:
             yield from self.category.cil(indent + 1)
         yield ")", indent
-        if self.id is not None:
-            indent -= 1
-            yield ")", indent
 
 
-class CilLevelrange(BaseModel, CilNodeBase):
+class CilLevelrange(BaseModel, CilNodeBase, _CilAnonymousNodeBase):
     flavor: Literal["levelrange"]
     id: str | None
     low: str | CilLevel
     high: str | CilLevel
 
-    def cil(self, indent: int = 0) -> Iterable[tuple[str, int]]:
-        if self.id is not None:
-            yield f"({self.flavor} {self.id}", indent
-            indent += 1
+    def _anonymous_cil(self, indent: int = 0) -> Iterable[tuple[str, int]]:
         yield "(", indent
         yield from _str_or_cil(self.low, indent + 1)
         yield from _str_or_cil(self.high, indent + 1)
         yield ")", indent
-        if self.id is not None:
-            indent -= 1
-            yield ")", indent
 
 
 class CilRangetransition(BaseModel, CilNodeBase):
@@ -729,10 +712,10 @@ class CilIpaddr(BaseModel, CilNodeBase):
     ip: str
 
     def cil(self, indent: int = 0) -> Iterable[tuple[str, int]]:
-        if self.id is None:
-            yield f"({self.ip})", indent
-        else:
+        if self.id:
             yield f"({self.flavor} {self.id} {self.ip})", indent
+        else:
+            yield f"({self.ip})", indent
 
 
 class CilNetifcon(BaseModel, CilNodeBase):
@@ -971,7 +954,7 @@ class CilTyperule(BaseModel, CilNodeBase):
     result: str
 
     def cil(self, indent: int = 0) -> Iterable[tuple[str, int]]:
-        name_str = f' "{self.name}"' if self.name is not None else ""
+        name_str = f' "{self.name}"' if self.name else ""
         yield (
             f"({self.flavor} {self.source} {self.target} "
             f"{self.cls}{name_str} {self.result})",
@@ -1259,4 +1242,4 @@ class CilDiffNode(BaseModel):
 
     @property
     def contains_changes(self) -> bool:
-        return len(self.diffs) > 0 or len(self.children) > 0
+        return bool(self.diffs or self.children)
