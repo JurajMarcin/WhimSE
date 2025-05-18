@@ -141,7 +141,7 @@ static void hash_cil_expr(const struct cil_list *expr,
 
     qsort(children_hashes, expr_len, HASH_SIZE, &cmp_hash_qsort_cmp);
     cmp_hash_update(hash_state, expr_len * HASH_SIZE, children_hashes);
-    free(children_hashes);
+    mem_free(children_hashes);
 
 exit:
     cmp_hash_finish(hash_state, full_hash);
@@ -206,7 +206,7 @@ static void hash_cil_string_list(const struct cil_list *list,
         qsort(children_hashes, list_len, HASH_SIZE, &cmp_hash_qsort_cmp);
     }
     cmp_hash_update(hash_state, list_len * HASH_SIZE, children_hashes);
-    free(children_hashes);
+    mem_free(children_hashes);
 
 exit:
     cmp_hash_finish(hash_state, full_hash);

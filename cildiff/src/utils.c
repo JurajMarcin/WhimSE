@@ -106,6 +106,6 @@ exit:
 
 void file_data_destroy(struct file_data *data)
 {
-    free(data->data);
+    mem_free(data->data);
     memset(data, 0, sizeof(*data));
 }

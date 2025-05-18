@@ -43,7 +43,7 @@ inline void *__mem_realloc(void *old_mem, size_t new_size, const char *file,
                            int line)
 {
     if (new_size == 0) {
-        free(old_mem);
+        mem_free(old_mem);
         return NULL;
     }
     void *new_mem = realloc(old_mem, new_size);
