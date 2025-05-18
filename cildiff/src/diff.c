@@ -18,8 +18,8 @@
 #include "diff.h"
 
 #include <assert.h>
-#include <stdio.h>
 #include <inttypes.h>
+#include <stdio.h>
 
 #include <cil/cil.h>
 #include <cil_internal.h>
@@ -29,8 +29,8 @@
 #include "cmp_common.h"
 #include "mem.h"
 
-
-struct diff_tree_node *diff_tree_create(const struct cmp_node *left_root, const struct cmp_node *right_root)
+struct diff_tree_node *diff_tree_create(const struct cmp_node *left_root,
+                                        const struct cmp_node *right_root)
 {
     struct diff_tree_node *diff_node = mem_alloc(sizeof(*diff_node));
     *diff_node = (struct diff_tree_node) {
@@ -40,7 +40,10 @@ struct diff_tree_node *diff_tree_create(const struct cmp_node *left_root, const 
     return diff_node;
 }
 
-struct diff_tree_node *diff_tree_append_child(struct diff_tree_node *diff_node_parent, const struct cmp_node *left_node, const struct cmp_node *right_node)
+struct diff_tree_node *
+diff_tree_append_child(struct diff_tree_node *diff_node_parent,
+                       const struct cmp_node *left_node,
+                       const struct cmp_node *right_node)
 {
     struct diff_tree_node *diff_node = mem_alloc(sizeof(*diff_node));
     *diff_node = (struct diff_tree_node) {
@@ -58,7 +61,10 @@ struct diff_tree_node *diff_tree_append_child(struct diff_tree_node *diff_node_p
     return diff_node;
 }
 
-struct diff *diff_tree_append_diff(struct diff_tree_node *diff_node, enum diff_side side, const struct cmp_node *node, char *description)
+struct diff *diff_tree_append_diff(struct diff_tree_node *diff_node,
+                                   enum diff_side side,
+                                   const struct cmp_node *node,
+                                   char *description)
 {
     struct diff *diff = mem_alloc(sizeof(*diff));
     *diff = (struct diff) {
@@ -76,19 +82,26 @@ struct diff *diff_tree_append_diff(struct diff_tree_node *diff_node, enum diff_s
     return diff;
 }
 
-static void diff_print_context(enum diff_side side, const struct diff_tree_node *diff_node, FILE *out)
+static void diff_print_context(enum diff_side side,
+                               const struct diff_tree_node *diff_node,
+                               FILE *out)
 {
-    if (diff_node->parent) {
-        diff_print_context(side, diff_node->parent, out);
+    for (const struct diff_tree_node *parent = diff_node; parent;
+         parent = parent->parent) {
+        const struct cmp_node *node =
+            side == DIFF_LEFT ? parent->left_node : parent->right_node;
+        assert(node);
+        fprintf(out, "; \t%s node on line %" PRIu32 "\n",
+                cil_node_to_string(node->cil_node), node->cil_node->line);
     }
-    const struct cmp_node *node = side == DIFF_LEFT ? diff_node->left_node : diff_node->right_node;
-    assert(node);
-    fprintf(out, "; \t%s node on line %" PRIu32 "\n", cil_node_to_string(node->cil_node), node->cil_node->line);
 }
 
-static void diff_print(const struct diff_tree_node *parent, const struct diff *diff, FILE *out)
+static void diff_print(const struct diff_tree_node *parent,
+                       const struct diff *diff, FILE *out)
 {
-    fprintf(out, "; %s found on line %" PRIu32 "\n", diff->side == DIFF_LEFT ? "Addition" : "Deletion", diff->node->cil_node->line);
+    fprintf(out, "; %s found on line %" PRIu32 "\n",
+            diff->side == DIFF_LEFT ? "Addition" : "Deletion",
+            diff->node->cil_node->line);
     if (diff->decription) {
         fprintf(out, "; Description: %s\n", diff->decription);
     }
@@ -99,7 +112,7 @@ static void diff_print(const struct diff_tree_node *parent, const struct diff *d
     diff_print_context(DIFF_LEFT, parent, out);
     fprintf(out, "; Right context:\n");
     diff_print_context(DIFF_RIGHT, parent, out);
-    fprintf(out, "; %s\n", diff->side == DIFF_LEFT ? "+++": "---");
+    fprintf(out, "; %s\n", diff->side == DIFF_LEFT ? "+++" : "---");
     cil_write_ast_node(out, diff->node->cil_node);
     switch (diff->node->cil_node->flavor) {
     case CIL_CLASS:
@@ -115,7 +128,8 @@ static void diff_print(const struct diff_tree_node *parent, const struct diff *d
 
 void diff_tree_print(const struct diff_tree_node *root, FILE *out)
 {
-    for (const struct diff_tree_node *child = root->cl_head; child; child = child->next) {
+    for (const struct diff_tree_node *child = root->cl_head; child;
+         child = child->next) {
         diff_tree_print(child, out);
     }
     for (const struct diff *diff = root->dl_head; diff; diff = diff->next) {

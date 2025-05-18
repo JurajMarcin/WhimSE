@@ -5,20 +5,19 @@
 
 #include <sepol/policydb/hashtab.h>
 
-
 #define HASH_SIZE 32
 
-
 void cmp_hash(size_t data_len, const void *data, char hash[HASH_SIZE]);
-
 
 struct cmp_hash_state;
 
 struct cmp_hash_state *cmp_hash_begin(const char *flavor);
 
-void cmp_hash_update(struct cmp_hash_state *hash_state, size_t data_len, const void *data);
+void cmp_hash_update(struct cmp_hash_state *hash_state, size_t data_len,
+                     const void *data);
 
-void cmp_hash_update_string(struct cmp_hash_state *hash_state, const char *string);
+void cmp_hash_update_string(struct cmp_hash_state *hash_state,
+                            const char *string);
 
 struct cmp_hash_state *cmp_hash_copy(const struct cmp_hash_state *hash_state);
 
@@ -26,12 +25,13 @@ void cmp_hash_finish(struct cmp_hash_state *hash_state, char hash[HASH_SIZE]);
 
 int cmp_hash_cmp(const char hash1[HASH_SIZE], const char hash2[HASH_SIZE]);
 
-void cmp_hash_to_string(const char hash[HASH_SIZE], char string[HASH_SIZE * 2 + 1]);
+void cmp_hash_to_string(const char hash[HASH_SIZE],
+                        char string[HASH_SIZE * 2 + 1]);
 
 unsigned int cmp_hash_hashtab_hash(hashtab_t hashtab, const_hashtab_key_t key1);
 
-int cmp_hash_hashtab_cmp(hashtab_t hashtab, const_hashtab_key_t key1, const_hashtab_key_t key2);
-
+int cmp_hash_hashtab_cmp(hashtab_t hashtab, const_hashtab_key_t key1,
+                         const_hashtab_key_t key2);
 
 int cmp_hash_qsort_cmp(const void *a, const void *b);
 

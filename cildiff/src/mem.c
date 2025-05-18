@@ -21,11 +21,11 @@
 #include <error.h>
 #include <string.h>
 
-
 inline void __mem_check(void *mem, const char *verb, const char *file, int line)
 {
     if (!mem) {
-        error(EXIT_FAILURE, errno, "Failed to %s memory at %s:%d", verb, file, line);
+        error(EXIT_FAILURE, errno, "Failed to %s memory at %s:%d", verb, file,
+              line);
     }
 }
 
@@ -39,7 +39,8 @@ inline void *__mem_alloc(size_t size, const char *file, int line)
     return mem;
 }
 
-inline void *__mem_realloc(void *old_mem, size_t new_size, const char *file, int line)
+inline void *__mem_realloc(void *old_mem, size_t new_size, const char *file,
+                           int line)
 {
     if (new_size == 0) {
         free(old_mem);

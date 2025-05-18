@@ -26,7 +26,6 @@
 
 #include "mem.h"
 
-
 void cmp_hash(size_t data_len, const void *data, char hash[HASH_SIZE])
 {
     struct cmp_hash_state *hash_state = cmp_hash_begin(NULL);
@@ -53,14 +52,17 @@ struct cmp_hash_state *cmp_hash_begin(const char *flavor)
     return hash_state;
 }
 
-void cmp_hash_update(struct cmp_hash_state *hash_state, size_t data_len, const void *data)
+void cmp_hash_update(struct cmp_hash_state *hash_state, size_t data_len,
+                     const void *data)
 {
     if (!EVP_DigestUpdate(hash_state->ctx, data, data_len)) {
-        error(EXIT_FAILURE, 0, "Failed to update hash state with data of length %zu", data_len);
+        error(EXIT_FAILURE, 0,
+              "Failed to update hash state with data of length %zu", data_len);
     }
 }
 
-void cmp_hash_update_string(struct cmp_hash_state *hash_state, const char *string)
+void cmp_hash_update_string(struct cmp_hash_state *hash_state,
+                            const char *string)
 {
     cmp_hash_update(hash_state, strlen(string) + 1, string);
 }
@@ -75,7 +77,8 @@ struct cmp_hash_state *cmp_hash_copy(const struct cmp_hash_state *hash_state)
 
 void cmp_hash_finish(struct cmp_hash_state *hash_state, char hash[HASH_SIZE])
 {
-    unsigned char md[EVP_MAX_MD_SIZE > HASH_SIZE ? EVP_MAX_MD_SIZE : HASH_SIZE] = {0};
+    unsigned char
+        md[EVP_MAX_MD_SIZE > HASH_SIZE ? EVP_MAX_MD_SIZE : HASH_SIZE] = { 0 };
     if (!EVP_DigestFinal_ex(hash_state->ctx, md, NULL)) {
         error(EXIT_FAILURE, 0, "Failed to finalize hash state");
     }
@@ -100,7 +103,8 @@ int cmp_hash_cmp(const char hash1[HASH_SIZE], const char hash2[HASH_SIZE])
     return memcmp(hash1, hash2, HASH_SIZE);
 }
 
-void cmp_hash_to_string(const char hash[HASH_SIZE], char string[HASH_SIZE * 2 + 1])
+void cmp_hash_to_string(const char hash[HASH_SIZE],
+                        char string[HASH_SIZE * 2 + 1])
 {
     for (size_t i = 0; i < HASH_SIZE; i++) {
         sprintf(&string[i * 2], "%02hhx", (unsigned char)hash[i]);
@@ -114,9 +118,9 @@ unsigned int cmp_hash_hashtab_hash(hashtab_t hashtab, const_hashtab_key_t key)
     return ((const unsigned int *)key)[0] % mod;
 }
 
-int cmp_hash_hashtab_cmp(hashtab_t hashtab, const_hashtab_key_t key1, const_hashtab_key_t key2)
+int cmp_hash_hashtab_cmp(__attribute__((unused)) hashtab_t hashtab,
+                         const_hashtab_key_t key1, const_hashtab_key_t key2)
 {
-    (void)hashtab;
     return cmp_hash_cmp(key1, key2);
 }
 

@@ -21,8 +21,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <sepol/policydb/hashtab.h>
 #include <cil_flavor.h>
+#include <sepol/policydb/hashtab.h>
 
 #include "cmp_common.h"
 #include "cmp_node.h"
@@ -31,58 +31,60 @@
 #include "mem.h"
 #include "utils.h"
 
+#define DECLARE_SUBSET(name) struct cmp_subset_##name
+#define DECLARE_SUBSET_INIT(name)                                              \
+    static void cmp_subset_##name##_init(struct cmp_subset *subset)
+#define DECLARE_SUBSET_ADD_NODE(name)                                          \
+    static void cmp_subset_##name##_add_node(struct cmp_subset *subset,        \
+                                             struct cmp_node *node)
+#define DECLARE_SUBSET_FINALIZE(name)                                          \
+    static bool cmp_subset_##name##_finalize(struct cmp_subset *subset)
+#define DECLARE_SUBSET_COMPARE(name)                                           \
+    static void cmp_subset_##name##_compare(const struct cmp_subset *left,     \
+                                            const struct cmp_subset *right,    \
+                                            struct diff_tree_node *diff_node)
+#define DECLARE_SUBSET_SIM(name)                                               \
+    static void cmp_subset_##name##_sim(const struct cmp_subset *left,         \
+                                        const struct cmp_subset *right)
+#define DECLARE_SUBSET_DESTROY(name)                                           \
+    static void cmp_subset_##name##_destroy(struct cmp_subset *subset)
 
-#define DECLARE_SUBSET(name) \
-    struct cmp_subset_ ## name
-#define DECLARE_SUBSET_INIT(name) \
-    static void cmp_subset_ ## name ## _init(struct cmp_subset *subset)
-#define DECLARE_SUBSET_ADD_NODE(name) \
-    static void cmp_subset_ ## name ## _add_node(struct cmp_subset *subset, struct cmp_node *node)
-#define DECLARE_SUBSET_FINALIZE(name) \
-    static bool cmp_subset_ ## name ## _finalize(struct cmp_subset *subset)
-#define DECLARE_SUBSET_COMPARE(name) \
-    static void cmp_subset_ ## name ## _compare(const struct cmp_subset *left, const struct cmp_subset *right, struct diff_tree_node *diff_node)
-#define DECLARE_SUBSET_SIM(name) \
-    static void cmp_subset_ ## name ## _sim(const struct cmp_subset *left, const struct cmp_subset *right)
-#define DECLARE_SUBSET_DESTROY(name) \
-    static void cmp_subset_ ## name ## _destroy(struct cmp_subset *subset)
+#define REGISTER_SUBSET(name) .data_size = sizeof(struct cmp_subset_##name)
+#define REGISTER_SUBSET_INIT(name) .init = cmp_subset_##name##_init
+#define REGISTER_SUBSET_ADD_NODE(name) .add_node = cmp_subset_##name##_add_node
+#define REGISTER_SUBSET_FINALIZE(name) .finalize = cmp_subset_##name##_finalize
+#define REGISTER_SUBSET_COMPARE(name) .compare = cmp_subset_##name##_compare
+#define REGISTER_SUBSET_SIM(name) .sim = cmp_subset_##name##_sim
+#define REGISTER_SUBSET_DESTROY(name) .destroy = cmp_subset_##name##_destroy
 
-#define REGISTER_SUBSET(name) \
-    .data_size = sizeof(struct cmp_subset_ ## name)
-#define REGISTER_SUBSET_INIT(name) \
-    .init = cmp_subset_ ## name ## _init
-#define REGISTER_SUBSET_ADD_NODE(name) \
-    .add_node = cmp_subset_ ## name ## _add_node
-#define REGISTER_SUBSET_FINALIZE(name) \
-    .finalize = cmp_subset_ ## name ## _finalize
-#define REGISTER_SUBSET_COMPARE(name) \
-    .compare = cmp_subset_ ## name ## _compare
-#define REGISTER_SUBSET_SIM(name) \
-    .sim = cmp_subset_ ## name ## _sim
-#define REGISTER_SUBSET_DESTROY(name) \
-    .destroy = cmp_subset_ ## name ## _destroy
-
-
-DECLARE_SUBSET(container_single_jump_node) {
+DECLARE_SUBSET(container_single_jump_node)
+{
     char _;
 };
+
 DECLARE_SUBSET_COMPARE(container_single_jump_node)
 {
-    assert(!left != !right || (left->items->nel == 1 && right->items->nel == 1));
-    cmp_node_compare(MAYBE(left, items->htable[0]->datum), MAYBE(right, items->htable[0]->datum), diff_node);
+    assert(!left != !right
+           || (left->items->nel == 1 && right->items->nel == 1));
+    cmp_node_compare(MAYBE(left, items->htable[0]->datum),
+                     MAYBE(right, items->htable[0]->datum), diff_node);
 }
 
-
-DECLARE_SUBSET(container_single) {
+DECLARE_SUBSET(container_single)
+{
     char _;
 };
+
 DECLARE_SUBSET_COMPARE(container_single)
 {
-    assert(!left != !right || (left->items->nel == 1 && right->items->nel == 1));
+    assert(!left != !right
+           || (left->items->nel == 1 && right->items->nel == 1));
     const struct cmp_node *left_node = MAYBE(left, items->htable[0]->datum);
     const struct cmp_node *right_node = MAYBE(right, items->htable[0]->datum);
     if (left_node && right_node) {
-        cmp_node_compare(left_node, right_node, diff_tree_append_child(diff_node, left_node, right_node));
+        cmp_node_compare(
+            left_node, right_node,
+            diff_tree_append_child(diff_node, left_node, right_node));
     } else if (left_node) {
         diff_tree_append_diff(diff_node, DIFF_LEFT, left_node, NULL);
     } else {
@@ -90,8 +92,8 @@ DECLARE_SUBSET_COMPARE(container_single)
     }
 }
 
-
-DECLARE_SUBSET(container_sim) {
+DECLARE_SUBSET(container_sim)
+{
     char _;
 };
 
@@ -102,15 +104,17 @@ struct container_sim_compare_args {
     const struct cmp_node ***unique;
 };
 
-static int container_sim_compare_map(hashtab_key_t key, hashtab_datum_t datum, void *opaque)
+static int container_sim_compare_map(__attribute__((unused)) hashtab_key_t key,
+                                     hashtab_datum_t datum, void *opaque)
 {
-    (void)key;
     const struct cmp_node *this_node = datum;
     struct container_sim_compare_args *args = opaque;
 
-    const struct cmp_node *other_node = hashtab_search(MAYBE(args->other_side, items), this_node->full_hash);
+    const struct cmp_node *other_node =
+        hashtab_search(MAYBE(args->other_side, items), this_node->full_hash);
     if (!other_node) {
-        *args->unique = mem_realloc(*(args->unique), (*args->unique_len + 1) * sizeof(**args->unique));
+        *args->unique = mem_realloc(
+            *(args->unique), (*args->unique_len + 1) * sizeof(**args->unique));
         (*args->unique)[*args->unique_len] = this_node;
         (*args->unique_len)++;
     }
@@ -192,7 +196,9 @@ DECLARE_SUBSET_COMPARE(container_sim)
         if (!left_node || !right_node) {
             continue;
         }
-        cmp_node_compare(left_node, right_node, diff_tree_append_child(diff_node, left_node, right_node));
+        cmp_node_compare(
+            left_node, right_node,
+            diff_tree_append_child(diff_node, left_node, right_node));
         unique_left[sims[i].left_i] = NULL;
         unique_right[sims[i].right_i] = NULL;
     }
@@ -216,7 +222,6 @@ DECLARE_SUBSET_COMPARE(container_sim)
     mem_free(unique_left);
     mem_free(unique_right);
 }
-
 
 static const struct cmp_subset_def subset_defs[] = {
     [CIL_ROOT] = {
@@ -255,10 +260,9 @@ static const struct cmp_subset_def subset_defs[] = {
 #define SUBSET_DEFS_COUNT (sizeof(subset_defs) / sizeof(*subset_defs))
 static const struct cmp_subset_def default_def = { 0 };
 
-
 const struct cmp_subset_def *cmp_subset_get_def(enum cil_flavor flavor)
 {
-    if (flavor >= SUBSET_DEFS_COUNT) {
+    if (flavor >= SUBSET_DEFS_COUNT || !subset_defs[flavor].data_size) {
         return &default_def;
     }
     return &subset_defs[flavor];

@@ -6,15 +6,16 @@
 #include "cmp_common.h"
 #include "diff.h"
 
-
 struct cmp_set {
     char full_hash[HASH_SIZE];
-    hashtab_t items; /* key: char partial_hash[HASH_SIZE], value: struct cmp_subset *subset */
+    hashtab_t items; /* key: char partial_hash[HASH_SIZE],
+                        value: struct cmp_subset *subset */
 };
 
 struct cmp_set *cmp_set_create(struct cil_tree_node *cl_head);
 
-void cmp_set_compare(struct cmp_set *left, struct cmp_set *right, struct diff_tree_node *diff_node);
+void cmp_set_compare(struct cmp_set *left, struct cmp_set *right,
+                     struct diff_tree_node *diff_node);
 
 struct cmp_sim cmp_set_sim(const struct cmp_set *left, struct cmp_set *right);
 

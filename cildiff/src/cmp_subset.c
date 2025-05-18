@@ -34,14 +34,15 @@
 #include "mem.h"
 #include "utils.h"
 
-
 struct cmp_subset *cmp_subset_create(const struct cmp_node *node)
 {
-    const struct cmp_subset_def *def = cmp_subset_get_def(node->cil_node->flavor);
+    const struct cmp_subset_def *def =
+        cmp_subset_get_def(node->cil_node->flavor);
     struct cmp_subset *subset = mem_alloc(sizeof(*subset));
     *subset = (struct cmp_subset) {
         .flavor = node->cil_node->flavor,
-        .items = hashtab_create(&cmp_hash_hashtab_hash, &cmp_hash_hashtab_cmp, 10),
+        .items =
+            hashtab_create(&cmp_hash_hashtab_hash, &cmp_hash_hashtab_cmp, 10),
         .data = mem_alloc(def->data_size),
     };
     mem_check(subset->items);
@@ -58,23 +59,25 @@ void cmp_subset_add_node(struct cmp_subset *subset, struct cmp_node *node)
     const struct cmp_subset_def *def = cmp_subset_get_def(subset->flavor);
     int rc = hashtab_insert(subset->items, node->full_hash, node);
     if (rc == SEPOL_EEXIST) {
-        // const struct cmp_node *duplicate = hashtab_search(subset->items, node->full_hash);
-        // error(0, 0, "cmp_subset_add_node: Found duplicate rule of type %d (%s) at line %d with rule at line %d", node->cil_node->flavor, cil_node_to_string(node->cil_node), node->cil_node->line, duplicate->cil_node->line);
+        /* Ignore duplicates */
         cmp_node_destroy(node);
         return;
     } else if (rc) {
-        error(EXIT_FAILURE, 0, "cmp_subset_add_node: Failed to add node to hashtab");
+        error(EXIT_FAILURE, 0,
+              "cmp_subset_add_node: Failed to add node to hashtab");
     }
     if (def->add_node) {
         def->add_node(subset, node);
     }
 }
 
-static int finalize_copy_hashtab_map(hashtab_key_t key, hashtab_datum_t datum, void *opaque)
+static int finalize_copy_hashtab_map(hashtab_key_t key, hashtab_datum_t datum,
+                                     void *opaque)
 {
     hashtab_t hashtab = opaque;
     if (hashtab_insert(hashtab, key, datum)) {
-        error(EXIT_FAILURE, 0, "cmp_subset_add_node: Failed to add node to hashtab");
+        error(EXIT_FAILURE, 0,
+              "cmp_subset_add_node: Failed to add node to hashtab");
     }
     return 0;
 }
@@ -84,9 +87,11 @@ struct finalize_hash_children_args {
     char *child_hashes;
 };
 
-static int finalize_hash_children_map(hashtab_key_t key, hashtab_datum_t datum, void *opaque)
+static int
+finalize_hash_children_map(hashtab_key_t key,
+                           __attribute__((unused)) hashtab_datum_t datum,
+                           void *opaque)
 {
-    (void)datum;
     struct finalize_hash_children_args *args = opaque;
 
     memcpy(args->child_hashes + HASH_SIZE * args->i, key, HASH_SIZE);
@@ -99,7 +104,8 @@ void cmp_subset_finalize(struct cmp_subset *subset)
     const struct cmp_subset_def *def = cmp_subset_get_def(subset->flavor);
 
     if (!def->finalize || !def->finalize(subset)) {
-        hashtab_t hashtab = hashtab_create(&cmp_hash_hashtab_hash, &cmp_hash_hashtab_cmp, subset->items->nel);
+        hashtab_t hashtab = hashtab_create(
+            &cmp_hash_hashtab_hash, &cmp_hash_hashtab_cmp, subset->items->nel);
         mem_check(hashtab);
         hashtab_map(subset->items, &finalize_copy_hashtab_map, hashtab);
         hashtab_destroy(subset->items);
@@ -108,15 +114,21 @@ void cmp_subset_finalize(struct cmp_subset *subset)
             struct finalize_hash_children_args finalize_hash_children_args = {
                 .child_hashes = subset->full_hash,
             };
-            hashtab_map(subset->items, &finalize_hash_children_map, &finalize_hash_children_args);
+            hashtab_map(subset->items, &finalize_hash_children_map,
+                        &finalize_hash_children_args);
         } else {
             struct finalize_hash_children_args finalize_hash_children_args = {
                 .child_hashes = mem_alloc(HASH_SIZE * subset->items->nel),
             };
-            hashtab_map(subset->items, &finalize_hash_children_map, &finalize_hash_children_args);
-            qsort(finalize_hash_children_args.child_hashes, finalize_hash_children_args.i, HASH_SIZE, &cmp_hash_qsort_cmp);
+            hashtab_map(subset->items, &finalize_hash_children_map,
+                        &finalize_hash_children_args);
+            qsort(finalize_hash_children_args.child_hashes,
+                  finalize_hash_children_args.i, HASH_SIZE,
+                  &cmp_hash_qsort_cmp);
 
-            cmp_hash(HASH_SIZE * finalize_hash_children_args.i, finalize_hash_children_args.child_hashes, subset->full_hash);
+            cmp_hash(HASH_SIZE * finalize_hash_children_args.i,
+                     finalize_hash_children_args.child_hashes,
+                     subset->full_hash);
 
             mem_free(finalize_hash_children_args.child_hashes);
         }
@@ -129,21 +141,25 @@ struct subset_compare_args {
     struct diff_tree_node *diff_node;
 };
 
-static int subset_compare_map(hashtab_key_t key, hashtab_datum_t datum, void *opaque)
+static int subset_compare_map(__attribute__((unused)) hashtab_key_t key,
+                              hashtab_datum_t datum, void *opaque)
 {
-    (void)key;
     const struct cmp_node *this_node = datum;
     struct subset_compare_args *args = opaque;
 
-    const struct cmp_node *other_node = hashtab_search(MAYBE(args->other_side, items), this_node->full_hash);
+    const struct cmp_node *other_node =
+        hashtab_search(MAYBE(args->other_side, items), this_node->full_hash);
     if (!other_node) {
-        diff_tree_append_diff(args->diff_node, args->this_side, this_node, NULL);
+        diff_tree_append_diff(args->diff_node, args->this_side, this_node,
+                              NULL);
     }
 
     return 0;
 }
 
-void cmp_subset_compare(const struct cmp_subset *left, const struct cmp_subset *right, struct diff_tree_node *diff_node)
+void cmp_subset_compare(const struct cmp_subset *left,
+                        const struct cmp_subset *right,
+                        struct diff_tree_node *diff_node)
 {
     if (!left && !right) {
         return;
@@ -152,7 +168,8 @@ void cmp_subset_compare(const struct cmp_subset *left, const struct cmp_subset *
     if (!cmp_hash_cmp(MAYBE(left, full_hash), MAYBE(right, full_hash))) {
         return;
     }
-    const struct cmp_subset_def *def = cmp_subset_get_def(EITHER(left, right, flavor));
+    const struct cmp_subset_def *def =
+        cmp_subset_get_def(EITHER(left, right, flavor));
     if (def->compare) {
         def->compare(left, right, diff_node);
         return;
@@ -177,13 +194,14 @@ struct subset_sim_args {
     struct cmp_sim *sim;
 };
 
-static int subset_sim_map(hashtab_key_t key, hashtab_datum_t datum, void *opaque)
+static int subset_sim_map(__attribute__((unused)) hashtab_key_t key,
+                          hashtab_datum_t datum, void *opaque)
 {
-    (void)key;
     const struct cmp_node *this_node = datum;
     struct subset_sim_args *args = opaque;
 
-    const struct cmp_node *other_node = hashtab_search(MAYBE(args->other_side, items), this_node->full_hash);
+    const struct cmp_node *other_node =
+        hashtab_search(MAYBE(args->other_side, items), this_node->full_hash);
     if (other_node) {
         args->sim->common++;
     } else {
@@ -202,13 +220,15 @@ static int subset_sim_map(hashtab_key_t key, hashtab_datum_t datum, void *opaque
     return 0;
 }
 
-struct cmp_sim cmp_subset_sim(const struct cmp_subset *left, const struct cmp_subset *right)
+struct cmp_sim cmp_subset_sim(const struct cmp_subset *left,
+                              const struct cmp_subset *right)
 {
     if (!left && !right) {
         return (struct cmp_sim) { 0 };
     }
     assert(!left || !right || left->flavor == right->flavor);
-    const struct cmp_subset_def *def = cmp_subset_get_def(EITHER(left, right, flavor));
+    const struct cmp_subset_def *def =
+        cmp_subset_get_def(EITHER(left, right, flavor));
     if (!cmp_hash_cmp(MAYBE(left, full_hash), MAYBE(right, full_hash))) {
         return (struct cmp_sim) { .common = left->items->nel };
     }
@@ -234,10 +254,11 @@ struct cmp_sim cmp_subset_sim(const struct cmp_subset *left, const struct cmp_su
     return sim;
 }
 
-static int subset_destroy_map(hashtab_key_t key, hashtab_datum_t datum, void *opaque)
+static int subset_destroy_map(__attribute__((unused)) hashtab_key_t key,
+                              hashtab_datum_t datum,
+                              __attribute__((unused)) void *opaque)
 {
-    (void)key; // key points to a static array inside datum struct
-    (void)opaque;
+    /* key points to a static array inside datum struct */
     struct cmp_node *node = datum;
     cmp_node_destroy(node);
     return 0;

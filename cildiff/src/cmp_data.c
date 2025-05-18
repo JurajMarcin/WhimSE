@@ -23,78 +23,85 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <cil_internal.h>
 #include <cil_flavor.h>
+#include <cil_internal.h>
 #include <cil_list.h>
 
 #include "cmp_common.h"
 #include "mem.h"
+#include "utils.h"
 
-
-typedef void (*cmp_data_init_fn)(const void *cil_data, struct cmp_hash_state *full_hash, struct cmp_hash_state **partial_hash);
+typedef void (*cmp_data_init_fn)(const void *cil_data,
+                                 struct cmp_hash_state *full_hash,
+                                 struct cmp_hash_state **partial_hash);
 
 struct cmp_data_def {
     const char *flavor_name;
     cmp_data_init_fn init;
 };
 
+#define DEFINE_DATA(name, type)                                                \
+    static void cmp_data_##name##_init(const type *name,                       \
+                                       struct cmp_hash_state *full_hash,       \
+                                       struct cmp_hash_state **partial_hash);  \
+    static void __cmp_data_##name##_init_shim(                                 \
+        const void *cil_data, struct cmp_hash_state *full_hash,                \
+        struct cmp_hash_state **partial_hash)                                  \
+    {                                                                          \
+        cmp_data_##name##_init(cil_data, full_hash, partial_hash);             \
+    }                                                                          \
+    static void cmp_data_##name##_init(const type *name,                       \
+                                       struct cmp_hash_state *full_hash,       \
+                                       struct cmp_hash_state **partial_hash)
 
-#define DEFINE_DATA(name, type) \
-static void cmp_data_ ## name ## _init(const type *name, struct cmp_hash_state *full_hash, struct cmp_hash_state **partial_hash); \
-static void __cmp_data_ ## name ## _init_shim(const void *cil_data, struct cmp_hash_state *full_hash, struct cmp_hash_state **partial_hash) \
-{ \
-    cmp_data_ ## name ## _init(cil_data, full_hash, partial_hash); \
-} \
-static void cmp_data_ ## name ## _init(const type *name, struct cmp_hash_state *full_hash, struct cmp_hash_state **partial_hash)
-
-#define REGISTER_DATA(name) \
-.flavor_name = # name, \
-.init = __cmp_data_ ## name ## _init_shim
-
+#define REGISTER_DATA(name)                                                    \
+    .flavor_name = #name, .init = __cmp_data_##name##_init_shim
 
 /******************************************************************************
  *  Common                                                                    *
  ******************************************************************************/
 
 #define DEFINE_DATA_SIMPLE_DECL(decl_name, type)                               \
-DEFINE_DATA(decl_name, struct cil_symtab_datum)                                \
-{                                                                              \
-    (void)partial_hash;                                                        \
-    static_assert(offsetof(type, datum) == 0,                                  \
-                  # decl_name " is not a simple CIL declaration");             \
-    /* TODO: use fqn */                                                        \
-    cmp_hash_update_string(full_hash, decl_name->name);                        \
-}
+    DEFINE_DATA(decl_name, struct cil_symtab_datum)                            \
+    {                                                                          \
+        UNUSED(partial_hash);                                                  \
+        static_assert(offsetof(type, datum) == 0,                              \
+                      #decl_name " is not a simple CIL declaration");          \
+        cmp_hash_update_string(full_hash, decl_name->name);                    \
+    }
 
-#define DEFINE_DATA_ALIAS(decl_name) \
-DEFINE_DATA_SIMPLE_DECL(decl_name, struct cil_alias)
+#define DEFINE_DATA_ALIAS(decl_name)                                           \
+    DEFINE_DATA_SIMPLE_DECL(decl_name, struct cil_alias)
 
-#define DEFINE_DATA_ALIAS_ACTUAL(decl_name) \
-DEFINE_DATA(decl_name, struct cil_aliasactual) \
-{ \
-    cmp_hash_update_string(full_hash, decl_name->alias_str); \
-    *partial_hash = cmp_hash_copy(full_hash); \
-    cmp_hash_update_string(full_hash, decl_name->actual_str); \
-}
+#define DEFINE_DATA_ALIAS_ACTUAL(decl_name)                                    \
+    DEFINE_DATA(decl_name, struct cil_aliasactual)                             \
+    {                                                                          \
+        cmp_hash_update_string(full_hash, decl_name->alias_str);               \
+        *partial_hash = cmp_hash_copy(full_hash);                              \
+        cmp_hash_update_string(full_hash, decl_name->actual_str);              \
+    }
 
-void hash_str_or_data(struct cmp_hash_state *hash_state, enum cil_flavor flavor, const char *str, const void *data)
+void hash_str_or_data(struct cmp_hash_state *hash_state, enum cil_flavor flavor,
+                      const char *str, const void *data)
 {
     if (str) {
         cmp_hash_update_string(hash_state, str);
     } else {
-        struct cmp_data cmp_data = {0};
+        struct cmp_data cmp_data = { 0 };
         cmp_data_init(flavor, data, &cmp_data);
         cmp_hash_update(hash_state, HASH_SIZE, cmp_data.full_hash);
     }
 }
 
-static void hash_cil_expr(const struct cil_list *expr, char full_hash[HASH_SIZE])
+static void hash_cil_expr(const struct cil_list *expr,
+                          char full_hash[HASH_SIZE])
 {
     struct cmp_hash_state *hash_state = cmp_hash_begin("<expr>");
     cmp_hash_update(hash_state, sizeof(expr->flavor), &expr->flavor);
 
     size_t expr_len = 0;
-    for (const struct cil_list_item *expr_item = expr->head; expr_item; expr_item = expr_item->next) {
+    for (const struct cil_list_item *expr_item = expr->head; expr_item;
+         expr_item = expr_item->next) {
         expr_len++;
     }
     if (!expr_len) {
@@ -114,16 +121,20 @@ static void hash_cil_expr(const struct cil_list *expr, char full_hash[HASH_SIZE]
     for (size_t i = 0; i < expr_len; expr_item = expr_item->next, i++) {
         switch (expr_item->flavor) {
         case CIL_STRING:
-            cmp_hash(strlen(expr_item->data) + 1, expr_item->data, children_hashes + i * HASH_SIZE);
+            cmp_hash(strlen(expr_item->data) + 1, expr_item->data,
+                     children_hashes + i * HASH_SIZE);
             break;
         case CIL_LIST:
             hash_cil_expr(expr_item->data, children_hashes + i * HASH_SIZE);
             break;
         case CIL_CONS_OPERAND:
-            cmp_hash(sizeof(expr_item->data), &expr_item->data, children_hashes + i * HASH_SIZE);
+            cmp_hash(sizeof(expr_item->data), &expr_item->data,
+                     children_hashes + i * HASH_SIZE);
             break;
         default:
-            error(EXIT_FAILURE, 0, "hash_cil_expr: Invalid node in expr list %d", expr_item->flavor);
+            error(EXIT_FAILURE, 0,
+                  "hash_cil_expr: Invalid node in expr list %d",
+                  expr_item->flavor);
         }
     }
     assert(!expr_item);
@@ -142,16 +153,21 @@ enum list_order {
     LIST_ORDER_ORDERED,
 };
 
-static void hash_cil_string_list(const struct cil_list *list, enum list_order order, char full_hash[HASH_SIZE])
+static void hash_cil_string_list(const struct cil_list *list,
+                                 enum list_order order,
+                                 char full_hash[HASH_SIZE])
 {
     struct cmp_hash_state *hash_state = cmp_hash_begin("<list>");
     cmp_hash_update(hash_state, sizeof(list->flavor), &list->flavor);
 
     size_t list_len = 0;
-    for (const struct cil_list_item *list_item = list->head; list_item; list_item = list_item->next) {
+    for (const struct cil_list_item *list_item = list->head; list_item;
+         list_item = list_item->next) {
         list_len++;
         if (list_item->flavor != CIL_STRING) {
-            error(EXIT_FAILURE, 0, "hash_cil_expr: Invalid node in string list %d", list_item->flavor);
+            error(EXIT_FAILURE, 0,
+                  "hash_cil_expr: Invalid node in string list %d",
+                  list_item->flavor);
         }
     }
     if (!list_len) {
@@ -161,7 +177,9 @@ static void hash_cil_string_list(const struct cil_list *list, enum list_order or
     const struct cil_list_item *list_item = list->head;
     if (list_item->data == CIL_KEY_UNORDERED) {
         if (order != LIST_ORDER_ALLOW_UNORDERED) {
-            error(EXIT_FAILURE, 0, "hash_cil_expr: List cannot be marked with 'unordered' keyword");
+            error(
+                EXIT_FAILURE, 0,
+                "hash_cil_expr: List cannot be marked with 'unordered' keyword");
         }
         order = LIST_ORDER_UNORDERED;
         list_item = list_item->next;
@@ -179,7 +197,8 @@ static void hash_cil_string_list(const struct cil_list *list, enum list_order or
     char *children_hashes = mem_alloc(HASH_SIZE * list_len);
     memset(children_hashes, 0, HASH_SIZE * list_len);
     for (size_t i = 0; i < list_len; list_item = list_item->next, i++) {
-        cmp_hash(strlen(list_item->data) + 1, list_item->data, children_hashes + i * HASH_SIZE);
+        cmp_hash(strlen(list_item->data) + 1, list_item->data,
+                 children_hashes + i * HASH_SIZE);
     }
     assert(!list_item);
 
@@ -193,42 +212,45 @@ exit:
     cmp_hash_finish(hash_state, full_hash);
 }
 
-#define DEFINE_DATA_BOUNDS(decl_name) \
-DEFINE_DATA(decl_name, struct cil_bounds) \
-{ \
-    (void)partial_hash; \
-    cmp_hash_update_string(full_hash, decl_name->parent_str); \
-    cmp_hash_update_string(full_hash, decl_name->child_str); \
-}
+#define DEFINE_DATA_BOUNDS(decl_name)                                          \
+    DEFINE_DATA(decl_name, struct cil_bounds)                                  \
+    {                                                                          \
+        UNUSED(partial_hash);                                                  \
+        cmp_hash_update_string(full_hash, decl_name->parent_str);              \
+        cmp_hash_update_string(full_hash, decl_name->child_str);               \
+    }
 
-#define DEFINE_DATA_ATTRIBUTESET(decl_name, type) \
-DEFINE_DATA(decl_name, type) \
-{ \
-    cmp_hash_update_string(full_hash, decl_name->attr_str); \
-    *partial_hash = cmp_hash_copy(full_hash); \
-    char expr_hash[HASH_SIZE]; \
-    hash_cil_expr(decl_name->str_expr, expr_hash); \
-    cmp_hash_update(full_hash, HASH_SIZE, expr_hash); \
-}
+#define DEFINE_DATA_ATTRIBUTESET(decl_name, type)                              \
+    DEFINE_DATA(decl_name, type)                                               \
+    {                                                                          \
+        cmp_hash_update_string(full_hash, decl_name->attr_str);                \
+        *partial_hash = cmp_hash_copy(full_hash);                              \
+        char expr_hash[HASH_SIZE];                                             \
+        hash_cil_expr(decl_name->str_expr, expr_hash);                         \
+        cmp_hash_update(full_hash, HASH_SIZE, expr_hash);                      \
+    }
 
-#define DEFINE_DATA_ORDERED(decl_name, order) \
-DEFINE_DATA(decl_name, struct cil_ordered) \
-{ \
-    *partial_hash = cmp_hash_copy(full_hash); \
-    char order_hash[HASH_SIZE]; \
-    hash_cil_string_list(decl_name->strs, order, order_hash); \
-    cmp_hash_update(full_hash, HASH_SIZE, order_hash); \
-}
+#define DEFINE_DATA_ORDERED(decl_name, order)                                  \
+    DEFINE_DATA(decl_name, struct cil_ordered)                                 \
+    {                                                                          \
+        *partial_hash = cmp_hash_copy(full_hash);                              \
+        char order_hash[HASH_SIZE];                                            \
+        hash_cil_string_list(decl_name->strs, order, order_hash);              \
+        cmp_hash_update(full_hash, HASH_SIZE, order_hash);                     \
+    }
 
-void hash_call_args_tree(const struct cil_tree_node *cil_node, char full_hash[HASH_SIZE])
+void hash_call_args_tree(const struct cil_tree_node *cil_node,
+                         char full_hash[HASH_SIZE])
 {
     assert(!cil_node->cl_head || !cil_node->data);
-    struct cmp_hash_state *hash_state = cmp_hash_begin(cil_node->data ? "<string>" : "<list>");
+    struct cmp_hash_state *hash_state =
+        cmp_hash_begin(cil_node->data ? "<string>" : "<list>");
     if (cil_node->data) {
         cmp_hash_update_string(hash_state, cil_node->data);
     }
-    for (const struct cil_tree_node *child = cil_node->cl_head; child; child = child->next) {
-        char child_full_hash[HASH_SIZE] = {0};
+    for (const struct cil_tree_node *child = cil_node->cl_head; child;
+         child = child->next) {
+        char child_full_hash[HASH_SIZE] = { 0 };
         hash_call_args_tree(child, child_full_hash);
         cmp_hash_update(hash_state, HASH_SIZE, child_full_hash);
     }
@@ -241,22 +263,22 @@ void hash_call_args_tree(const struct cil_tree_node *cil_node, char full_hash[HA
 
 DEFINE_DATA(string, char)
 {
-    (void)partial_hash;
+    UNUSED(partial_hash);
     cmp_hash_update_string(full_hash, string);
 }
 
 DEFINE_DATA(root, struct cil_root)
 {
-    (void)root;
-    (void)full_hash;
-    (void)partial_hash;
+    UNUSED(root);
+    UNUSED(full_hash);
+    UNUSED(partial_hash);
 }
 
 DEFINE_DATA(src_info, struct cil_src_info)
 {
-    (void)src_info;
-    (void)full_hash;
-    (void)partial_hash;
+    UNUSED(src_info);
+    UNUSED(full_hash);
+    UNUSED(partial_hash);
 }
 
 /******************************************************************************
@@ -265,30 +287,42 @@ DEFINE_DATA(src_info, struct cil_src_info)
 
 DEFINE_DATA(avrule, struct cil_avrule)
 {
-    cmp_hash_update(full_hash, sizeof(avrule->is_extended), &avrule->is_extended);
+    cmp_hash_update(full_hash, sizeof(avrule->is_extended),
+                    &avrule->is_extended);
     cmp_hash_update(full_hash, sizeof(avrule->rule_kind), &avrule->rule_kind);
     cmp_hash_update_string(full_hash, avrule->src_str);
     cmp_hash_update_string(full_hash, avrule->tgt_str);
     *partial_hash = cmp_hash_copy(full_hash);
     if (avrule->is_extended) {
-        hash_str_or_data(full_hash, CIL_PERMISSIONX, avrule->perms.x.permx_str, avrule->perms.x.permx);
+        hash_str_or_data(full_hash, CIL_PERMISSIONX, avrule->perms.x.permx_str,
+                         avrule->perms.x.permx);
     } else {
-        // After building AST, avrule should have a single anonymous or named classpermissionset
-        assert(avrule->perms.classperms->head == avrule->perms.classperms->tail);
-        struct cmp_data perms = {0};
-        cmp_data_init(avrule->perms.classperms->head->flavor, avrule->perms.classperms->head->data, &perms);
+        /*
+         * After building AST, avrule should have a single anonymous or named
+         * classpermissionset
+         */
+        assert(avrule->perms.classperms->head
+               == avrule->perms.classperms->tail);
+        struct cmp_data perms = { 0 };
+        cmp_data_init(avrule->perms.classperms->head->flavor,
+                      avrule->perms.classperms->head->data, &perms);
         cmp_hash_update(full_hash, HASH_SIZE, perms.full_hash);
     }
 }
+
 DEFINE_DATA(deny, struct cil_deny_rule)
 {
     cmp_hash_update_string(full_hash, deny->src_str);
     cmp_hash_update_string(full_hash, deny->tgt_str);
     *partial_hash = cmp_hash_copy(full_hash);
-    // After building AST, deny should have a single anonymous or named classpermissionset
+    /*
+     * After building AST, deny should have a single anonymous or named
+     * classpermissionset
+     */
     assert(deny->classperms->head == deny->classperms->tail);
-    struct cmp_data perms = {0};
-    cmp_data_init(deny->classperms->head->flavor, deny->classperms->head->data, &perms);
+    struct cmp_data perms = { 0 };
+    cmp_data_init(deny->classperms->head->flavor, deny->classperms->head->data,
+                  &perms);
     cmp_hash_update(full_hash, HASH_SIZE, perms.full_hash);
 }
 
@@ -298,18 +332,20 @@ DEFINE_DATA(deny, struct cil_deny_rule)
 
 DEFINE_DATA(call, struct cil_call)
 {
-    (void)partial_hash;
+    UNUSED(partial_hash);
     cmp_hash_update_string(full_hash, call->macro_str);
-    char args_hash[HASH_SIZE] = {0};
+    char args_hash[HASH_SIZE] = { 0 };
     hash_call_args_tree(call->args_tree->root, args_hash);
     cmp_hash_update(full_hash, HASH_SIZE, args_hash);
 }
+
 DEFINE_DATA(macro, struct cil_macro)
 {
     cmp_hash_update_string(full_hash, macro->datum.name);
     *partial_hash = cmp_hash_copy(full_hash);
 
-    for (const struct cil_list_item *item = macro->params->head; item; item = item->next) {
+    for (const struct cil_list_item *item = macro->params->head; item;
+         item = item->next) {
         assert(item->flavor == CIL_PARAM);
         const struct cil_param *param = item->data;
         cmp_hash_update(full_hash, sizeof(param->flavor), &param->flavor);
@@ -323,6 +359,7 @@ DEFINE_DATA(macro, struct cil_macro)
 
 DEFINE_DATA_SIMPLE_DECL(perm, struct cil_perm)
 DEFINE_DATA_SIMPLE_DECL(common, struct cil_class)
+
 DEFINE_DATA(classcommon, struct cil_classcommon)
 {
     cmp_hash_update_string(full_hash, classcommon->class_str);
@@ -332,45 +369,56 @@ DEFINE_DATA(classcommon, struct cil_classcommon)
 DEFINE_DATA_SIMPLE_DECL(class, struct cil_class)
 DEFINE_DATA_ORDERED(classorder, LIST_ORDER_ALLOW_UNORDERED)
 DEFINE_DATA_SIMPLE_DECL(classpermission, struct cil_classpermission)
+
 DEFINE_DATA(classperms_set, struct cil_classperms_set)
 {
-    (void)partial_hash;
+    UNUSED(partial_hash);
     cmp_hash_update_string(full_hash, classperms_set->set_str);
 }
+
 DEFINE_DATA(classperms, struct cil_classperms)
 {
     cmp_hash_update_string(full_hash, classperms->class_str);
     *partial_hash = cmp_hash_copy(full_hash);
-    char perms_hash[HASH_SIZE] = {0};
+    char perms_hash[HASH_SIZE] = { 0 };
     hash_cil_expr(classperms->perm_strs, perms_hash);
     cmp_hash_update(full_hash, HASH_SIZE, perms_hash);
 }
+
 DEFINE_DATA(classpermissionset, struct cil_classpermissionset)
 {
     cmp_hash_update_string(full_hash, classpermissionset->set_str);
     *partial_hash = cmp_hash_copy(full_hash);
-    assert(classpermissionset->classperms->head == classpermissionset->classperms->tail);
+    assert(classpermissionset->classperms->head
+           == classpermissionset->classperms->tail);
     assert(classpermissionset->classperms->head->flavor == CIL_CLASSPERMS);
-    struct cmp_data perms = {0};
-    cmp_data_init(CIL_CLASSPERMS, classpermissionset->classperms->head->data, &perms);
+    struct cmp_data perms = { 0 };
+    cmp_data_init(CIL_CLASSPERMS, classpermissionset->classperms->head->data,
+                  &perms);
     cmp_hash_update(full_hash, HASH_SIZE, perms.full_hash);
 }
 DEFINE_DATA_SIMPLE_DECL(classmap, struct cil_class)
+
 DEFINE_DATA(classmapping, struct cil_classmapping)
 {
     cmp_hash_update_string(full_hash, classmapping->map_class_str);
     cmp_hash_update_string(full_hash, classmapping->map_perm_str);
     *partial_hash = cmp_hash_copy(full_hash);
-    // After building AST, classmapping should have a single anonymous or named classpermissionset
+    /*
+     * After building AST, classmapping should have a single anonymous or named
+     * classpermissionset
+     */
     assert(classmapping->classperms->head == classmapping->classperms->tail);
-    struct cmp_data perms = {0};
-    cmp_data_init(classmapping->classperms->head->flavor, classmapping->classperms->head->data, &perms);
+    struct cmp_data perms = { 0 };
+    cmp_data_init(classmapping->classperms->head->flavor,
+                  classmapping->classperms->head->data, &perms);
     cmp_hash_update(full_hash, HASH_SIZE, perms.full_hash);
 }
+
 DEFINE_DATA(permissionx, struct cil_permissionx)
 {
     if (permissionx->datum.name) {
-        cmp_hash_update_string(full_hash, permissionx->datum.name); // TODO: fqn?
+        cmp_hash_update_string(full_hash, permissionx->datum.name);
     } else {
         cmp_hash_update_string(full_hash, "<anonymous::permissionx>");
     }
@@ -388,10 +436,11 @@ DEFINE_DATA(permissionx, struct cil_permissionx)
 
 DEFINE_DATA(boolean, struct cil_bool)
 {
-    cmp_hash_update_string(full_hash, boolean->datum.name); // TODO: fqn?
+    cmp_hash_update_string(full_hash, boolean->datum.name);
     *partial_hash = cmp_hash_copy(full_hash);
     cmp_hash_update(full_hash, sizeof(boolean->value), &boolean->value);
 }
+
 DEFINE_DATA(booleanif, struct cil_booleanif)
 {
     char expr_hash[HASH_SIZE];
@@ -399,12 +448,14 @@ DEFINE_DATA(booleanif, struct cil_booleanif)
     cmp_hash_update(full_hash, HASH_SIZE, expr_hash);
     *partial_hash = cmp_hash_copy(full_hash);
 }
+
 DEFINE_DATA(tunable, struct cil_tunable)
 {
-    cmp_hash_update_string(full_hash, tunable->datum.name); // TODO: fqn?
+    cmp_hash_update_string(full_hash, tunable->datum.name);
     *partial_hash = cmp_hash_copy(full_hash);
     cmp_hash_update(full_hash, sizeof(tunable->value), &tunable->value);
 }
+
 DEFINE_DATA(tunableif, struct cil_tunableif)
 {
     char expr_hash[HASH_SIZE];
@@ -419,16 +470,21 @@ DEFINE_DATA(tunableif, struct cil_tunableif)
 
 DEFINE_DATA(constrain, struct cil_constrain)
 {
-    // After building AST, constrain should have a single anonymous or named classpermissionset
+    /*
+     * After building AST, constrain should have a single anonymous or named
+     * classpermissionset
+     */
     assert(constrain->classperms->head == constrain->classperms->tail);
-    struct cmp_data perms = {0};
-    cmp_data_init(constrain->classperms->head->flavor, constrain->classperms->head->data, &perms);
+    struct cmp_data perms = { 0 };
+    cmp_data_init(constrain->classperms->head->flavor,
+                  constrain->classperms->head->data, &perms);
     cmp_hash_update(full_hash, HASH_SIZE, perms.full_hash);
     *partial_hash = cmp_hash_copy(full_hash);
     char expr_hash[HASH_SIZE];
     hash_cil_expr(constrain->str_expr, expr_hash);
     cmp_hash_update(full_hash, HASH_SIZE, expr_hash);
 }
+
 DEFINE_DATA(validatetrans, struct cil_validatetrans)
 {
     cmp_hash_update_string(full_hash, validatetrans->class_str);
@@ -437,18 +493,24 @@ DEFINE_DATA(validatetrans, struct cil_validatetrans)
     hash_cil_expr(validatetrans->str_expr, expr_hash);
     cmp_hash_update(full_hash, HASH_SIZE, expr_hash);
 }
+
 DEFINE_DATA(mlsconstrain, struct cil_constrain)
 {
-    // After building AST, mlsconstrain should have a single anonymous or named classpermissionset
+    /*
+     * After building AST, mlsconstrain should have a single anonymous or named
+     * classpermissionset
+     */
     assert(mlsconstrain->classperms->head == mlsconstrain->classperms->tail);
-    struct cmp_data perms = {0};
-    cmp_data_init(mlsconstrain->classperms->head->flavor, mlsconstrain->classperms->head->data, &perms);
+    struct cmp_data perms = { 0 };
+    cmp_data_init(mlsconstrain->classperms->head->flavor,
+                  mlsconstrain->classperms->head->data, &perms);
     cmp_hash_update(full_hash, HASH_SIZE, perms.full_hash);
     *partial_hash = cmp_hash_copy(full_hash);
     char expr_hash[HASH_SIZE];
     hash_cil_expr(mlsconstrain->str_expr, expr_hash);
     cmp_hash_update(full_hash, HASH_SIZE, expr_hash);
 }
+
 DEFINE_DATA(mlsvalidatetrans, struct cil_validatetrans)
 {
     cmp_hash_update_string(full_hash, mlsvalidatetrans->class_str);
@@ -463,24 +525,28 @@ DEFINE_DATA(mlsvalidatetrans, struct cil_validatetrans)
  ******************************************************************************/
 
 DEFINE_DATA_SIMPLE_DECL(block, struct cil_block)
+
 DEFINE_DATA(blockabstract, struct cil_blockabstract)
 {
-    (void)partial_hash;
+    UNUSED(partial_hash);
     cmp_hash_update_string(full_hash, blockabstract->block_str);
 }
+
 DEFINE_DATA(blockinherit, struct cil_blockinherit)
 {
-    (void)partial_hash;
+    UNUSED(partial_hash);
     cmp_hash_update_string(full_hash, blockinherit->block_str);
 }
+
 DEFINE_DATA(optional, struct cil_optional)
 {
     *partial_hash = cmp_hash_copy(full_hash);
-    cmp_hash_update_string(full_hash, optional->datum.name); // TODO: fqn?
+    cmp_hash_update_string(full_hash, optional->datum.name);
 }
+
 DEFINE_DATA(in, struct cil_in)
 {
-    (void)partial_hash;
+    UNUSED(partial_hash);
     cmp_hash_update(full_hash, sizeof(in->is_after), &in->is_after);
     cmp_hash_update_string(full_hash, in->block_str);
 }
@@ -492,7 +558,7 @@ DEFINE_DATA(in, struct cil_in)
 DEFINE_DATA(context, struct cil_context)
 {
     if (context->datum.name) {
-        cmp_hash_update_string(full_hash, context->datum.name); // TODO: fqn?
+        cmp_hash_update_string(full_hash, context->datum.name);
     } else {
         cmp_hash_update_string(full_hash, "<anonymous::context>");
     }
@@ -500,7 +566,8 @@ DEFINE_DATA(context, struct cil_context)
     cmp_hash_update_string(full_hash, context->user_str);
     cmp_hash_update_string(full_hash, context->role_str);
     cmp_hash_update_string(full_hash, context->type_str);
-    hash_str_or_data(full_hash, CIL_LEVELRANGE, context->range_str, context->range);
+    hash_str_or_data(full_hash, CIL_LEVELRANGE, context->range_str,
+                     context->range);
 }
 
 /******************************************************************************
@@ -509,19 +576,25 @@ DEFINE_DATA(context, struct cil_context)
 
 DEFINE_DATA(cil_default, struct cil_default)
 {
-    cmp_hash_update(full_hash, sizeof(cil_default->flavor), &cil_default->flavor);
-    cmp_hash_update(full_hash, sizeof(cil_default->object), &cil_default->object);
+    cmp_hash_update(full_hash, sizeof(cil_default->flavor),
+                    &cil_default->flavor);
+    cmp_hash_update(full_hash, sizeof(cil_default->object),
+                    &cil_default->object);
     *partial_hash = cmp_hash_copy(full_hash);
     char class_hash[HASH_SIZE];
-    hash_cil_string_list(cil_default->class_strs, LIST_ORDER_UNORDERED, class_hash);
+    hash_cil_string_list(cil_default->class_strs, LIST_ORDER_UNORDERED,
+                         class_hash);
     cmp_hash_update(full_hash, HASH_SIZE, class_hash);
 }
+
 DEFINE_DATA(defaultrange, struct cil_defaultrange)
 {
-    cmp_hash_update(full_hash, sizeof(defaultrange->object_range), &defaultrange->object_range);
+    cmp_hash_update(full_hash, sizeof(defaultrange->object_range),
+                    &defaultrange->object_range);
     *partial_hash = cmp_hash_copy(full_hash);
     char class_hash[HASH_SIZE];
-    hash_cil_string_list(defaultrange->class_strs, LIST_ORDER_UNORDERED, class_hash);
+    hash_cil_string_list(defaultrange->class_strs, LIST_ORDER_UNORDERED,
+                         class_hash);
     cmp_hash_update(full_hash, HASH_SIZE, class_hash);
 }
 
@@ -536,25 +609,31 @@ DEFINE_DATA(filecon, struct cil_filecon)
     *partial_hash = cmp_hash_copy(full_hash);
     if (filecon->context_str || filecon->context) {
         cmp_hash_update_string(full_hash, "<context>");
-        hash_str_or_data(full_hash, CIL_CONTEXT, filecon->context_str, filecon->context);
+        hash_str_or_data(full_hash, CIL_CONTEXT, filecon->context_str,
+                         filecon->context);
     } else {
         cmp_hash_update_string(full_hash, "<empty_context>");
     }
 }
+
 DEFINE_DATA(fsuse, struct cil_fsuse)
 {
-    (void)partial_hash;
+    UNUSED(partial_hash);
     cmp_hash_update(full_hash, sizeof(fsuse->type), &fsuse->type);
     cmp_hash_update_string(full_hash, fsuse->fs_str);
-    hash_str_or_data(full_hash, CIL_CONTEXT, fsuse->context_str, fsuse->context);
+    hash_str_or_data(full_hash, CIL_CONTEXT, fsuse->context_str,
+                     fsuse->context);
 }
+
 DEFINE_DATA(genfscon, struct cil_genfscon)
 {
     cmp_hash_update_string(full_hash, genfscon->fs_str);
     cmp_hash_update_string(full_hash, genfscon->path_str);
-    cmp_hash_update(full_hash, sizeof(genfscon->file_type), &genfscon->file_type);
+    cmp_hash_update(full_hash, sizeof(genfscon->file_type),
+                    &genfscon->file_type);
     *partial_hash = cmp_hash_copy(full_hash);
-    hash_str_or_data(full_hash, CIL_CONTEXT, genfscon->context_str, genfscon->context);
+    hash_str_or_data(full_hash, CIL_CONTEXT, genfscon->context_str,
+                     genfscon->context);
 }
 
 /******************************************************************************
@@ -564,17 +643,22 @@ DEFINE_DATA(genfscon, struct cil_genfscon)
 DEFINE_DATA(ibpkeycon, struct cil_ibpkeycon)
 {
     cmp_hash_update_string(full_hash, ibpkeycon->subnet_prefix_str);
-    cmp_hash_update(full_hash, sizeof(ibpkeycon->pkey_low), &ibpkeycon->pkey_low);
-    cmp_hash_update(full_hash, sizeof(ibpkeycon->pkey_low), &ibpkeycon->pkey_low);
+    cmp_hash_update(full_hash, sizeof(ibpkeycon->pkey_low),
+                    &ibpkeycon->pkey_low);
+    cmp_hash_update(full_hash, sizeof(ibpkeycon->pkey_low),
+                    &ibpkeycon->pkey_low);
     *partial_hash = cmp_hash_copy(full_hash);
-    hash_str_or_data(full_hash, CIL_CONTEXT, ibpkeycon->context_str, ibpkeycon->context);
+    hash_str_or_data(full_hash, CIL_CONTEXT, ibpkeycon->context_str,
+                     ibpkeycon->context);
 }
+
 DEFINE_DATA(ibendportcon, struct cil_ibendportcon)
 {
     cmp_hash_update_string(full_hash, ibendportcon->dev_name_str);
     cmp_hash_update(full_hash, sizeof(ibendportcon->port), &ibendportcon->port);
     *partial_hash = cmp_hash_copy(full_hash);
-    hash_str_or_data(full_hash, CIL_CONTEXT, ibendportcon->context_str, ibendportcon->context);
+    hash_str_or_data(full_hash, CIL_CONTEXT, ibendportcon->context_str,
+                     ibendportcon->context);
 }
 
 /******************************************************************************
@@ -589,10 +673,11 @@ DEFINE_DATA_SIMPLE_DECL(category, struct cil_cat)
 DEFINE_DATA_ALIAS(categoryalias)
 DEFINE_DATA_ALIAS_ACTUAL(categoryaliasactual)
 DEFINE_DATA_ORDERED(categoryorder, LIST_ORDER_ORDERED)
+
 DEFINE_DATA(categoryset, struct cil_catset)
 {
     if (categoryset->datum.name) {
-        cmp_hash_update_string(full_hash, categoryset->datum.name); // TODO: fqn?
+        cmp_hash_update_string(full_hash, categoryset->datum.name);
     } else {
         cmp_hash_update_string(full_hash, "<anonymous::categoryset>");
     }
@@ -601,6 +686,7 @@ DEFINE_DATA(categoryset, struct cil_catset)
     hash_cil_expr(categoryset->cats->str_expr, cats_hash);
     cmp_hash_update(full_hash, HASH_SIZE, cats_hash);
 }
+
 DEFINE_DATA(sensitivitycategory, struct cil_senscat)
 {
     cmp_hash_update_string(full_hash, sensitivitycategory->sens_str);
@@ -609,10 +695,11 @@ DEFINE_DATA(sensitivitycategory, struct cil_senscat)
     hash_cil_expr(sensitivitycategory->cats->str_expr, cats_hash);
     cmp_hash_update(full_hash, HASH_SIZE, cats_hash);
 }
+
 DEFINE_DATA(level, struct cil_level)
 {
     if (level->datum.name) {
-        cmp_hash_update_string(full_hash, level->datum.name); // TODO: fqn?
+        cmp_hash_update_string(full_hash, level->datum.name);
     } else {
         cmp_hash_update_string(full_hash, "<anonymous::level>");
     }
@@ -624,6 +711,7 @@ DEFINE_DATA(level, struct cil_level)
         cmp_hash_update(full_hash, HASH_SIZE, cats_hash);
     }
 }
+
 DEFINE_DATA(levelrange, struct cil_levelrange)
 {
     if (levelrange->datum.name) {
@@ -632,16 +720,20 @@ DEFINE_DATA(levelrange, struct cil_levelrange)
         cmp_hash_update_string(full_hash, "<anonymous::levelrange>");
     }
     *partial_hash = cmp_hash_copy(full_hash);
-    hash_str_or_data(full_hash, CIL_LEVEL, levelrange->low_str, levelrange->low);
-    hash_str_or_data(full_hash, CIL_LEVEL, levelrange->high_str, levelrange->high);
+    hash_str_or_data(full_hash, CIL_LEVEL, levelrange->low_str,
+                     levelrange->low);
+    hash_str_or_data(full_hash, CIL_LEVEL, levelrange->high_str,
+                     levelrange->high);
 }
+
 DEFINE_DATA(rangetransition, struct cil_rangetransition)
 {
     cmp_hash_update_string(full_hash, rangetransition->src_str);
     cmp_hash_update_string(full_hash, rangetransition->exec_str);
     cmp_hash_update_string(full_hash, rangetransition->obj_str);
     *partial_hash = cmp_hash_copy(full_hash);
-    hash_str_or_data(full_hash, CIL_LEVELRANGE, rangetransition->range_str, rangetransition->range);
+    hash_str_or_data(full_hash, CIL_LEVELRANGE, rangetransition->range_str,
+                     rangetransition->range);
 }
 
 /******************************************************************************
@@ -667,27 +759,34 @@ DEFINE_DATA(ipaddr, struct cil_ipaddr)
         assert(false /* Invalid IP address family */);
     }
 }
+
 DEFINE_DATA(netifcon, struct cil_netifcon)
 {
     cmp_hash_update_string(full_hash, netifcon->interface_str);
     *partial_hash = cmp_hash_copy(full_hash);
-    hash_str_or_data(full_hash, CIL_CONTEXT, netifcon->if_context_str, netifcon->if_context);
-    hash_str_or_data(full_hash, CIL_CONTEXT, netifcon->packet_context_str, netifcon->packet_context);
+    hash_str_or_data(full_hash, CIL_CONTEXT, netifcon->if_context_str,
+                     netifcon->if_context);
+    hash_str_or_data(full_hash, CIL_CONTEXT, netifcon->packet_context_str,
+                     netifcon->packet_context);
 }
+
 DEFINE_DATA(nodecon, struct cil_nodecon)
 {
     hash_str_or_data(full_hash, CIL_IPADDR, nodecon->addr_str, nodecon->addr);
     hash_str_or_data(full_hash, CIL_IPADDR, nodecon->mask_str, nodecon->mask);
     *partial_hash = cmp_hash_copy(full_hash);
-    hash_str_or_data(full_hash, CIL_CONTEXT, nodecon->context_str, nodecon->context);
+    hash_str_or_data(full_hash, CIL_CONTEXT, nodecon->context_str,
+                     nodecon->context);
 }
+
 DEFINE_DATA(portcon, struct cil_portcon)
 {
     cmp_hash_update(full_hash, sizeof(portcon->proto), &portcon->proto);
     cmp_hash_update(full_hash, sizeof(portcon->port_low), &portcon->port_low);
     cmp_hash_update(full_hash, sizeof(portcon->port_high), &portcon->port_high);
     *partial_hash = cmp_hash_copy(full_hash);
-    hash_str_or_data(full_hash, CIL_CONTEXT, portcon->context_str, portcon->context);
+    hash_str_or_data(full_hash, CIL_CONTEXT, portcon->context_str,
+                     portcon->context);
 }
 
 /******************************************************************************
@@ -699,10 +798,12 @@ DEFINE_DATA(mls, struct cil_mls)
     *partial_hash = cmp_hash_copy(full_hash);
     cmp_hash_update(full_hash, sizeof(mls->value), &mls->value);
 }
+
 DEFINE_DATA(handleunknown, struct cil_handleunknown)
 {
     *partial_hash = cmp_hash_copy(full_hash);
-    cmp_hash_update(full_hash, sizeof(handleunknown->handle_unknown), &handleunknown->handle_unknown);
+    cmp_hash_update(full_hash, sizeof(handleunknown->handle_unknown),
+                    &handleunknown->handle_unknown);
 }
 DEFINE_DATA_SIMPLE_DECL(policycap, struct cil_policycap)
 
@@ -711,6 +812,7 @@ DEFINE_DATA_SIMPLE_DECL(policycap, struct cil_policycap)
  ******************************************************************************/
 
 DEFINE_DATA_SIMPLE_DECL(role, struct cil_role)
+
 DEFINE_DATA(roletype, struct cil_roletype)
 {
     cmp_hash_update_string(full_hash, roletype->role_str);
@@ -719,12 +821,14 @@ DEFINE_DATA(roletype, struct cil_roletype)
 }
 DEFINE_DATA_SIMPLE_DECL(roleattribute, struct cil_roleattribute)
 DEFINE_DATA_ATTRIBUTESET(roleattributeset, struct cil_roleattributeset)
+
 DEFINE_DATA(roleallow, struct cil_roleallow)
 {
     cmp_hash_update_string(full_hash, roleallow->src_str);
     *partial_hash = cmp_hash_copy(full_hash);
     cmp_hash_update_string(full_hash, roleallow->tgt_str);
 }
+
 DEFINE_DATA(roletransition, struct cil_roletransition)
 {
     cmp_hash_update_string(full_hash, roletransition->src_str);
@@ -741,11 +845,13 @@ DEFINE_DATA_BOUNDS(rolebounds)
 
 DEFINE_DATA_SIMPLE_DECL(sid, struct cil_sid)
 DEFINE_DATA_ORDERED(sidorder, LIST_ORDER_ORDERED)
+
 DEFINE_DATA(sidcontext, struct cil_sidcontext)
 {
     cmp_hash_update_string(full_hash, sidcontext->sid_str);
     *partial_hash = cmp_hash_copy(full_hash);
-    hash_str_or_data(full_hash, CIL_CONTEXT, sidcontext->context_str, sidcontext->context);
+    hash_str_or_data(full_hash, CIL_CONTEXT, sidcontext->context_str,
+                     sidcontext->context);
 }
 
 /******************************************************************************
@@ -757,24 +863,30 @@ DEFINE_DATA_ALIAS(typealias)
 DEFINE_DATA_ALIAS_ACTUAL(typealiasactual)
 DEFINE_DATA_SIMPLE_DECL(typeattribute, struct cil_typeattribute)
 DEFINE_DATA_ATTRIBUTESET(typeattributeset, struct cil_typeattributeset)
+
 DEFINE_DATA(expandtypeattribute, struct cil_expandtypeattribute)
 {
-    cmp_hash_update(full_hash, sizeof(expandtypeattribute->expand), &expandtypeattribute->expand);
+    cmp_hash_update(full_hash, sizeof(expandtypeattribute->expand),
+                    &expandtypeattribute->expand);
     *partial_hash = cmp_hash_copy(full_hash);
     char attrs_hash[HASH_SIZE];
-    hash_cil_string_list(expandtypeattribute->attr_strs, LIST_ORDER_UNORDERED, attrs_hash);
+    hash_cil_string_list(expandtypeattribute->attr_strs, LIST_ORDER_UNORDERED,
+                         attrs_hash);
     cmp_hash_update(full_hash, HASH_SIZE, attrs_hash);
 }
 DEFINE_DATA_BOUNDS(typebounds)
+
 DEFINE_DATA(type_rule, struct cil_type_rule)
 {
-    cmp_hash_update(full_hash, sizeof(type_rule->rule_kind), &type_rule->rule_kind);
+    cmp_hash_update(full_hash, sizeof(type_rule->rule_kind),
+                    &type_rule->rule_kind);
     cmp_hash_update_string(full_hash, type_rule->src_str);
     cmp_hash_update_string(full_hash, type_rule->tgt_str);
     cmp_hash_update_string(full_hash, type_rule->obj_str);
     *partial_hash = cmp_hash_copy(full_hash);
     cmp_hash_update_string(full_hash, type_rule->result_str);
 }
+
 DEFINE_DATA(nametypetransition, struct cil_nametypetransition)
 {
     cmp_hash_update_string(full_hash, nametypetransition->src_str);
@@ -784,9 +896,10 @@ DEFINE_DATA(nametypetransition, struct cil_nametypetransition)
     *partial_hash = cmp_hash_copy(full_hash);
     cmp_hash_update_string(full_hash, nametypetransition->result_str);
 }
+
 DEFINE_DATA(typepermissive, struct cil_typepermissive)
 {
-    (void)partial_hash;
+    UNUSED(partial_hash);
     cmp_hash_update_string(full_hash, typepermissive->type_str);
 }
 
@@ -795,6 +908,7 @@ DEFINE_DATA(typepermissive, struct cil_typepermissive)
  ******************************************************************************/
 
 DEFINE_DATA_SIMPLE_DECL(user, struct cil_user)
+
 DEFINE_DATA(userrole, struct cil_userrole)
 {
     cmp_hash_update_string(full_hash, userrole->user_str);
@@ -803,37 +917,46 @@ DEFINE_DATA(userrole, struct cil_userrole)
 }
 DEFINE_DATA_SIMPLE_DECL(userattribute, struct cil_userattribute)
 DEFINE_DATA_ATTRIBUTESET(userattributeset, struct cil_userattributeset)
+
 DEFINE_DATA(userlevel, struct cil_userlevel)
 {
     cmp_hash_update_string(full_hash, userlevel->user_str);
     *partial_hash = cmp_hash_copy(full_hash);
-    hash_str_or_data(full_hash, CIL_LEVEL, userlevel->level_str, userlevel->level);
+    hash_str_or_data(full_hash, CIL_LEVEL, userlevel->level_str,
+                     userlevel->level);
 }
+
 DEFINE_DATA(userrange, struct cil_userrange)
 {
     cmp_hash_update_string(full_hash, userrange->user_str);
     *partial_hash = cmp_hash_copy(full_hash);
-    hash_str_or_data(full_hash, CIL_LEVELRANGE, userrange->range_str, userrange->range);
+    hash_str_or_data(full_hash, CIL_LEVELRANGE, userrange->range_str,
+                     userrange->range);
 }
 DEFINE_DATA_BOUNDS(userbounds)
+
 DEFINE_DATA(userprefix, struct cil_userprefix)
 {
     cmp_hash_update_string(full_hash, userprefix->user_str);
     *partial_hash = cmp_hash_copy(full_hash);
     cmp_hash_update_string(full_hash, userprefix->prefix_str);
 }
+
 DEFINE_DATA(selinuxuser, struct cil_selinuxuser)
 {
     cmp_hash_update_string(full_hash, selinuxuser->name_str);
     *partial_hash = cmp_hash_copy(full_hash);
     cmp_hash_update_string(full_hash, selinuxuser->user_str);
-    hash_str_or_data(full_hash, CIL_LEVELRANGE, selinuxuser->range_str, selinuxuser->range);
+    hash_str_or_data(full_hash, CIL_LEVELRANGE, selinuxuser->range_str,
+                     selinuxuser->range);
 }
+
 DEFINE_DATA(selinuxuserdefault, struct cil_selinuxuser)
 {
     *partial_hash = cmp_hash_copy(full_hash);
     cmp_hash_update_string(full_hash, selinuxuserdefault->user_str);
-    hash_str_or_data(full_hash, CIL_LEVELRANGE, selinuxuserdefault->range_str, selinuxuserdefault->range);
+    hash_str_or_data(full_hash, CIL_LEVELRANGE, selinuxuserdefault->range_str,
+                     selinuxuserdefault->range);
 }
 
 /******************************************************************************
@@ -842,35 +965,48 @@ DEFINE_DATA(selinuxuserdefault, struct cil_selinuxuser)
 
 DEFINE_DATA(iomemcon, struct cil_iomemcon)
 {
-    cmp_hash_update(full_hash, sizeof(iomemcon->iomem_low), &iomemcon->iomem_low);
-    cmp_hash_update(full_hash, sizeof(iomemcon->iomem_high), &iomemcon->iomem_high);
+    cmp_hash_update(full_hash, sizeof(iomemcon->iomem_low),
+                    &iomemcon->iomem_low);
+    cmp_hash_update(full_hash, sizeof(iomemcon->iomem_high),
+                    &iomemcon->iomem_high);
     *partial_hash = cmp_hash_copy(full_hash);
-    hash_str_or_data(full_hash, CIL_CONTEXT, iomemcon->context_str, iomemcon->context);
+    hash_str_or_data(full_hash, CIL_CONTEXT, iomemcon->context_str,
+                     iomemcon->context);
 }
+
 DEFINE_DATA(ioportcon, struct cil_ioportcon)
 {
-    cmp_hash_update(full_hash, sizeof(ioportcon->ioport_low), &ioportcon->ioport_low);
-    cmp_hash_update(full_hash, sizeof(ioportcon->ioport_high), &ioportcon->ioport_high);
+    cmp_hash_update(full_hash, sizeof(ioportcon->ioport_low),
+                    &ioportcon->ioport_low);
+    cmp_hash_update(full_hash, sizeof(ioportcon->ioport_high),
+                    &ioportcon->ioport_high);
     *partial_hash = cmp_hash_copy(full_hash);
-    hash_str_or_data(full_hash, CIL_CONTEXT, ioportcon->context_str, ioportcon->context);
+    hash_str_or_data(full_hash, CIL_CONTEXT, ioportcon->context_str,
+                     ioportcon->context);
 }
+
 DEFINE_DATA(pcidevicecon, struct cil_pcidevicecon)
 {
     cmp_hash_update(full_hash, sizeof(pcidevicecon->dev), &pcidevicecon->dev);
     *partial_hash = cmp_hash_copy(full_hash);
-    hash_str_or_data(full_hash, CIL_CONTEXT, pcidevicecon->context_str, pcidevicecon->context);
+    hash_str_or_data(full_hash, CIL_CONTEXT, pcidevicecon->context_str,
+                     pcidevicecon->context);
 }
+
 DEFINE_DATA(pirqcon, struct cil_pirqcon)
 {
     cmp_hash_update(full_hash, sizeof(pirqcon->pirq), &pirqcon->pirq);
     *partial_hash = cmp_hash_copy(full_hash);
-    hash_str_or_data(full_hash, CIL_CONTEXT, pirqcon->context_str, pirqcon->context);
+    hash_str_or_data(full_hash, CIL_CONTEXT, pirqcon->context_str,
+                     pirqcon->context);
 }
+
 DEFINE_DATA(devicetreecon, struct cil_devicetreecon)
 {
     cmp_hash_update_string(full_hash, devicetreecon->path);
     *partial_hash = cmp_hash_copy(full_hash);
-    hash_str_or_data(full_hash, CIL_CONTEXT, devicetreecon->context_str, devicetreecon->context);
+    hash_str_or_data(full_hash, CIL_CONTEXT, devicetreecon->context_str,
+                     devicetreecon->context);
 }
 
 static const struct cmp_data_def data_defs[] = {
@@ -881,7 +1017,7 @@ static const struct cmp_data_def data_defs[] = {
     /* Access Vector Rules */
     [CIL_AVRULE] = { REGISTER_DATA(avrule) },
     [CIL_AVRULEX] = { REGISTER_DATA(avrule) },
-    [CIL_DENY_RULE] = { REGISTER_DATA(deny)},
+    [CIL_DENY_RULE] = { REGISTER_DATA(deny) },
     /* Call / Macro Statements */
     [CIL_CALL] = { REGISTER_DATA(call) },
     [CIL_MACRO] = { REGISTER_DATA(macro) },
@@ -995,9 +1131,10 @@ static const struct cmp_data_def data_defs[] = {
 };
 #define DATA_DEFS_COUNT (sizeof(data_defs) / sizeof(*data_defs))
 
-void cmp_data_init(enum cil_flavor flavor, const void *cil_data, struct cmp_data *cmp_data)
+void cmp_data_init(enum cil_flavor flavor, const void *cil_data,
+                   struct cmp_data *cmp_data)
 {
-    if (flavor >= DATA_DEFS_COUNT || data_defs[flavor].init == NULL) {
+    if (flavor >= DATA_DEFS_COUNT || !data_defs[flavor].init) {
         error(EXIT_FAILURE, 0, "Encountered an unknown node type %d", flavor);
     }
     const struct cmp_data_def *def = &data_defs[flavor];

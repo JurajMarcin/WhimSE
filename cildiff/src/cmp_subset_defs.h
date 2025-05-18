@@ -5,12 +5,15 @@
 
 #include "cmp_subset.h"
 
-
 typedef void (*cmp_subset_init_fn)(struct cmp_subset *subset);
-typedef void (*cmp_subset_add_node_fn)(struct cmp_subset *subset, struct cmp_node *node);
+typedef void (*cmp_subset_add_node_fn)(struct cmp_subset *subset,
+                                       struct cmp_node *node);
 typedef bool (*cmp_subset_finalize_fn)(struct cmp_subset *subset);
-typedef void (*cmp_subset_compare_fn)(const struct cmp_subset *left, const struct cmp_subset *right, struct diff_tree_node *diff_node);
-typedef struct cmp_sim (*cmp_subset_sim_fn)(const struct cmp_subset *left, const struct cmp_subset *right);
+typedef void (*cmp_subset_compare_fn)(const struct cmp_subset *left,
+                                      const struct cmp_subset *right,
+                                      struct diff_tree_node *diff_node);
+typedef struct cmp_sim (*cmp_subset_sim_fn)(const struct cmp_subset *left,
+                                            const struct cmp_subset *right);
 typedef void (*cmp_subset_destroy_fn)(struct cmp_subset *subset);
 
 struct cmp_subset_def {
