@@ -197,8 +197,7 @@ class AVCAnalysis(Analysis[Report]):
             section = AnalysisResultSection("Possibly Caused AVC")
             section.add_item(avc.text, True)
             section.add_item(
-                "The mentioned AVC denial could be possibly caused by "
-                "the following policy modifications"
+                "The mentioned AVC could be possibly caused by the following policy modifications"
             )
             for matcher in matchers:
                 for policy_module_report in report.policy_modules:
