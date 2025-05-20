@@ -1,5 +1,5 @@
 Name:    whimse
-Version: 0.2
+Version: 0.3
 Release: 1%{?dist}
 Summary: What Have I Modified in SELinux
 
@@ -78,6 +78,9 @@ cildiff is a helper application that compares two CIL SELinux policies.
 
 
 %changelog
+* Sun May 18 2025 Juraj Marcin <juraj@jurajmarcin.com> - 0.3-1
+- Update to 0.3
+
 * Tue Apr 29 2025 Juraj Marcin <juraj@jurajmarcin.com> - 0.2-1
 - Update to 0.2
 
