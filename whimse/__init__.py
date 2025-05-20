@@ -24,7 +24,7 @@ from whimse.explore import explore_policy
 from whimse.report import report_formatter_factory
 from whimse.report.json import JSONReportFormattter
 
-__version__ = "0.3"
+__version__ = "0.4"
 
 
 def main() -> None:
