@@ -27,15 +27,15 @@ help: `whimse --help`.
 
 ## Building
 
-WhimSE consists of two programs: WhimSE Python module and CILdiff C program,
-which needs to be compiled and installed somewhere in `$PATH`, or the path to
-the CILdiff binary needs to be specified using `whimse --cildiff` during
-runtime.
+WhimSE consists of two programs: `whimse` Python module and `cildiff` C
+program, which needs to be compiled and installed somewhere in `$PATH`, or the
+path to the `cildiff` binary needs to be specified using `whimse --cildiff`
+during runtime.
 
-CILdiff is statically linked with `libsepol`. The included Makefile compiles it
-from the Git submodule in `cildiff/selinux`.
+`cildiff` is statically linked with `libsepol`. The included Makefile compiles
+it from the Git submodule in `cildiff/selinux`.
 
-### Building CILdiff
+### Building `cildiff`
 
 **Build dependencies:**
 
@@ -50,7 +50,7 @@ from the Git submodule in `cildiff/selinux`.
 - `bzip2`
 - `openssl`
 
-To build CILdiff, including the `libsepol.a` library:
+To build `cildiff`, including the `libsepol.a` library:
 
 ```sh
 # In case the selinux submodule is not downlaoded
@@ -61,7 +61,7 @@ make
 # make install
 ```
 
-### Building WhimSE
+### Building `whimse`
 
 **Runtime dependencies:**
 
@@ -82,4 +82,3 @@ pip install .
 # or
 python -m whimse
 ```
-
